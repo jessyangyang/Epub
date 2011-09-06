@@ -43,8 +43,10 @@
  */
 namespace Epub
 {
-	require_once __DIR__ . DIRECTORY_SEPARATOR . 'XML.php';
-	require_once __DIR__ . DIRECTORY_SEPARATOR . 'NCX.php';
+	require_once __DIR__ . \DIRECTORY_SEPARATOR . 'XML.php';
+	require_once __DIR__ . \DIRECTORY_SEPARATOR . 'NCX.php';
+	
+	use Exception;
 	
 	class OPF
 	{
@@ -72,20 +74,20 @@ namespace Epub
 		 * this specification.
 		 * @var array
 		 */
-		protected $manifest;
+		protected $manifest = array();
 		
 		/**
 		 * An arrangement of documents providing a linear reading order.
 		 * @var array
 		 */
-		protected $spine;
+		protected $spine = array();
 		
 		/**
 		 * A set of references to fundamental structural features of the publication, such as 
 		 * table of contents, foreword, bibliography, etc. 
 		 * @var array
 		 */
-		protected $guide;
+		protected $guide = array();
 		
 		/**
 		 * Navigation Control file for XML
@@ -94,18 +96,35 @@ namespace Epub
 		protected $ncx;
 		
 		/**
+		 * Container for refcounting of the files
+		 * @var array
+		 */
+		protected $fileRefCounter = array();
+		
+		/**
+		 * Container for the file usage
+		 * @var array
+		 */
+		protected $fileUsage = array();
+		
+		/**
+		 * href to id map
+		 * @var array
+		 */
+		protected $href2id = array();
+		
+		/**
 		 * Constructor.
 		 * 
 		 * @param string $xmlFile XML file
+		 * @param string $strict  Do not tolerate epub errors
+		 * 
 		 */
-		public function __construct($xmlFile = null)
+		public function __construct($xmlFile = null, $strict = true)
 		{
 			if ($xmlFile !== null) {
-
-				$this->readXML($xmlFile);
-				
+				$this->readXML($xmlFile, $strict);
 			} else {
-				
 				$this->uid      = 'Epub-' . uniqid();
 				$this->metadata = array(
 					'dc:title'      => array(
@@ -126,22 +145,263 @@ namespace Epub
 		                )
 		            )
 		        );
+		        $this->ncx = new NCX();
 			}
+		}
+
+		/**
+		 * Get protected properties
+		 * 
+		 * @param string $name Property name
+		 * 
+		 * @return mixed value
+		 */
+		public function __get($name)
+		{
+			return true === isset($this->{$name}) ? $this->{$name} : null;
+		}
+		
+		/**
+		 * Get metadata
+		 * 
+		 * @param string $meta   Meta name
+		 * @param string $prefix Namespace
+		 * 
+		 */
+		public function getMetadata($meta, $prefix = 'dc')
+		{
+			$key = $prefix . ':' . $meta;
+			return isset($this->metadata[$key]) ? $this->metadata[$key] : false;
+		}
+		
+		/**
+		 * Set metadata
+		 * 
+		 * @param string $meta  Meta name
+		 * @param string $value Value
+		 * @param string $role  Role
+		 * 
+		 */
+		public function setMetadata($meta, $value , array $attrs = array(), $prefix = 'dc')
+		{
+			$key = $prefix . ':' . $meta;
+			$this->metadata[$key] = array(
+				'value' => $value,
+				'attrs' => $attrs
+			);
+		}
+		
+		/**
+		 * Get manifest by identifier
+		 * 
+		 * @param string $id Manifest identifier
+		 * 
+		 * @return array 
+		 */
+		public function getManifestById($id)
+		{
+			return null === $id ? 
+				$this->manifest : (true === isset($this->manifest[$id]) ? $this->manifest[$id] : null);
+		}
+		
+		/**
+		 * Get manifest by href
+		 * 
+		 * @param string $href Manifest identifier
+		 * 
+		 * @return array 
+		 */
+		public function getManifestByHref($href)
+		{
+			foreach ($this->manifest as $item) {
+				if ($item['href'] === $href) {
+					return $item;
+				}
+			}
+		}
+		
+		/**
+		 * Get spine.
+		 * 
+		 * @return array 
+		 */
+		public function getSpine()
+		{
+			return $this->spine;
+		}
+		
+		/**
+		 * Set spine 
+		 * 
+		 * @return array 
+		 */
+		public function setSpine(array $spine)
+		{
+			$newSpine = array();
+			foreach ($spine as $idref => $linear) {
+				if (true === isset($this->manifest[$idref])) {
+                    $newSpine[$idref] = array(
+                    	'href'   => $this->manifest[$idref]['href'],
+                    	'linear' => $linear == 'no' ? 'no' : 'yes'
+                  	);
+                } else {
+                    throw new Exception(
+                        'Spine error: cannot find appropriate manifest item with id ' . $idref
+                    );
+                }
+			}
+			$this->spine = $newSpine;
+		}
+		
+		/**
+		 * Add chapter
+		 * 
+		 * @param string $title  The title of the chapter
+		 * @param string $file   The content file of the chapter
+		 * @param string $parent The identifier of the parent navPoint 
+		 * 
+		 * @return void
+		 */
+		public function addChapter($title, $file, $parent = null)
+		{
+			if (false === \is_file($file)) {
+				throw new Exception('File ' . $file . ' does not exist.');
+			}
+			if (false === \is_readable($file)) {
+				throw new Exception('File ' . $file . ' is not readable.');
+			}
+					
+			$mimetype = self::getMimetype($file);
+			if ($mimetype !== 'application/xhtml+xml' && $mimetype !== 'application/xml') {
+				throw new Exception('Unsupported mymetype of the content file "' . 
+					$file . '": ' . var_export($mimetype, 1));
+			}
+			
+			$ds = \DIRECTORY_SEPARATOR;
+			$content = XML::loadFile($file, __DIR__ . $ds . 'Schema' . $ds . 'content-xhtml.rng');
+			$content->registerXPathNamespace('ns', 'http://www.w3.org/1999/xhtml');
+			$refs = \array_merge(
+				$content->xpath('//ns:link'),
+				$content->xpath('//ns:img'),
+				$content->xpath('//ns:iframe')
+			);
+			$filePath = \dirname($file) . $ds;
+			$files    = array();
+			foreach ($refs as $ref) {
+				$src = XML::getAttr($ref, 'src');
+				if ($src === null) {
+					$src = XML::getAttr($ref, 'href');
+				}
+				if ($src === null) {
+					throw new Exception('Cannot determine file of node ' . \print_r($ref, 1));
+				}
+				$_file = $filePath . $src;
+				if (false === \is_file($_file)) {
+					throw new Exception('File "' . $_file . '" referenced within "' . 
+						$file . '" does not exist.');
+				}
+				if ('.css' === \strtolower(\substr($_file, -4))) {
+					$css = \file_get_contents($_file);
+					if (0 < \preg_match_all('#url\s*\(([^\)]+)\)#smi', $css, $m)) {
+						foreach ($m[1] as $val) {
+							if ("'" === ($c = $val[0]) || '"' === ($c = $val[0])) {
+								$val = \substr($val, 1, \strlen($val) - 2);
+							}
+							$path = \dirname($_file) . $ds . $val;
+							if (false === \is_file($path)) {
+								throw new Exception('File "' . $path . '" referenced within "' . 
+									$_file . '" does not exist.');
+							}
+							$files[] = $path;
+						}
+					}
+				}
+				$files[] = $_file;
+			}
+			$files[] = $file;
+			
+			// add files to the manifest
+			$files = \array_keys(\array_flip($files));
+			foreach ($files as $key => $_file) {
+				$x = ($_file === $file ? null : $file);
+				$this->addRefCount($_file, $x);
+				if ($this->fileRefCounter[$_file] === 1) {
+					$pinfo = \pathinfo($_file);
+					$id    = $pinfo['filename'];
+					$href  = str_replace($filePath, '', $_file);
+					$mime  = self::getMimetype($_file);
+					if (true === isset($this->manifest[$id])) {
+						if (\md5_file($_file) === \md5_file($this->manifest[$id]['file'])) {
+							// same file under same name already exists
+							$files[$key] = $this->manifest[$id]['file'];
+							$this->delRefCount($_file, $x);
+							$this->addRefCount($files[$key], $x);
+							continue;
+						} else {
+							// files are different
+							$i = 0;
+							$newid = $id . (++$i);
+							while (true === isset($this->manifest[$newid])) {
+								$newid = $id . (++$i);
+							}
+							$id = $newid;
+						}
+					}
+					
+					if (true === isset($this->href2id[$href])) {
+						throw new Exception('File "' . $href . 
+							'" is already exists within manifest under id ' . $id);
+					}
+	                $this->manifest[$id] = array(
+	                    'id'         => $id,
+	                	'href'       => $href,
+	                    'media-type' => $mime,
+	                	'file'   	 => $_file
+	                );
+	                $this->href2id[$href] = $id;
+				}
+			}
+			
+         	// add to navMap and spine
+         	$prevHref = $this->ncx->addNavPoint($id, $title, $href, $parent);
+         	if (false !== $prevHref) {
+         		$spine = array();
+         		foreach ($this->spine as $key => $val) {
+         			$spine[$key] = $val;
+         			if ($val['href'] === $prevHref) {
+         				$spine[$id] = array(
+			           		'href'   => $href,
+			            	'linear' => 'yes'
+			         	);
+         			}
+         		}
+         		$this->spine = $spine;
+         	} else {
+				$this->spine[$id] = array(
+	           		'href'   => $href,
+	            	'linear' => 'yes'
+	         	);
+         	}
 		}
 		
 		/**
 		 * Read existing package XML file
 		 * 
 		 * @param string $xmlFile XML file
+		 * @param string $strict  Do not tolerate epub errors
 		 * 
 		 * @return void
 		 */
-		protected function readXML($xmlFile)
+		protected function readXML($xmlFile, $strict = true)
 		{
-			$package       = XML::loadFile($xmlFile);
+			// shortcut
+			$ds = \DIRECTORY_SEPARATOR;
+			
+			$package       = XML::loadFile($xmlFile, __DIR__ . $ds . 'Schema' . $ds . 'opf.rng');
 			$this->uid     = XML::getAttr($package, 'unique-identifier');
 			$this->version = XML::getAttr($package, 'version');
 			
+			// parse metadata
 			$ns = $package->getDocNamespaces(true);
 			foreach ($ns as $prefix => $uri) {
 				foreach ($package->metadata->children($prefix, true) as $key => $value) {
@@ -151,8 +411,6 @@ namespace Epub
 							$this->metadata['meta'] = array();
 						}
 						$this->metadata['meta'][XML::getAttr($value, 'name')] = XML::getAttr($value, 'content');
-					} else if ($key == 'x-metadata') {
-						
 					} else {
 						$attrs = array();
                         $this->metadata[$key] = array(
@@ -171,38 +429,102 @@ namespace Epub
 				}
 			}
 			
+			// parse manifest
 			foreach ($package->manifest->item as $item) {
+				
+				// get node attributes
 				$id   = XML::getAttr($item, 'id');
 				$href = XML::getAttr($item, 'href');
-				$file = dirname($xmlFile) . DIRECTORY_SEPARATOR . $href;
-				if (false === is_file($file)) {
-					throw new \Exception('File "' . $file . '" referenced in manifest under id ' . 
+				$type = XML::getAttr($item, 'media-type');
+				$file = \dirname($xmlFile) . $ds . $href;
+				
+				// check foe existance of the file
+				if (false === \is_file($file)) {
+					throw new Exception('File "' . $file . '" referenced in manifest under id ' . 
 						$id . ' does not exist.');
 				}
+				
+				// validate content of the file
+				switch ($type) {
+					
+					case 'application/xhtml+xml':
+						$content = XML::loadFile($file, __DIR__ . $ds . 'Schema' . $ds . 'content-xhtml.rng');
+						$content->registerXPathNamespace('ns', 'http://www.w3.org/1999/xhtml');
+						$refs = \array_merge(
+							$content->xpath('//ns:link'),
+							$content->xpath('//ns:img'),
+							$content->xpath('//ns:iframe')
+						);
+						foreach ($refs as $ref) {
+							$src = XML::getAttr($ref, 'src');
+							if ($src === null) {
+								$src = XML::getAttr($ref, 'href');
+							}
+							if ($src === null) {
+								throw new Exception('Cannot determine file of node ' . print_r($ref, 1));
+							}
+							$_file = \dirname($file) . $ds . $src;
+							if (false === \is_file($_file)) {
+								throw new Exception('File "' . $_file . '" referenced within "' . 
+									$file . '" does not exist.');
+							}
+							if ('.css' === \strtolower(\substr($_file, -4))) {
+								$css = \file_get_contents($_file);
+								if (0 < \preg_match_all('#url\s*\(([^\)]+)\)#smi', $css, $m)) {
+									foreach ($m[1] as $val) {
+										if ("'" === ($c = $val[0]) || '"' === ($c = $val[0])) {
+											$val = \substr($val, 1, \strlen($val) - 2);
+										}
+										$path = \dirname($_file) . '/' . $val;
+										if (false === \is_file($path)) {
+											throw new Exception('File "' . $path . '" referenced within "' . 
+												$_file . '" does not exist.');
+										}
+										$this->addRefCount($path, $_file);
+									}
+								}
+							}
+							$this->addRefCount($_file, $file);
+						}
+						break;
+				}
+				
+				// increase refcounter
+				$this->addRefCount($file);
+				
+				// add to manifest
                 $this->manifest[$id] = array(
                     'id'         => $id,
                 	'href'       => $href,
-                    'media-type' => XML::getAttr($item, 'media-type'),
+                    'media-type' => $type,
                 	'file'   	 => $file
                 );
+                
+                $this->href2id[$href] = $id;
+                
+                // instantiate NCX
                 if ($id === 'ncx') {
-                	$this->ncx = new NCX($file);
+                	$this->ncx = new NCX($file, $strict);
                 }
             }
             
+            // parse spine
             foreach ($package->spine->itemref as $itemref) {
-         		$key = XML::getAttr($itemref, 'idref');
-                if ($key && true === isset($this->manifest[$key])) {
-                    $this->spine[$key] = array(
-                    	'href'   => $this->manifest[$key]['href'],
-                    	'linear' => XML::getAttr($itemref, 'linear')
+         		$idref  = XML::getAttr($itemref, 'idref');
+         		$linear = XML::getAttr($itemref, 'linear');
+                if ($idref && true === isset($this->manifest[$idref])) {
+                    $this->spine[$idref] = array(
+                    	'href'   => $this->manifest[$idref]['href'],
+                    	'linear' => $linear == 'no' ? 'no' : 'yes'
                   	);
                 } else {
-                    throw new \Exception(
-                        'Spine error: cannot find appropriate manifest item with id ' . $key
+                    throw new Exception(
+                        'Spine error: cannot find appropriate manifest item with id ' . $idref
                     );
                 }
             }
+            
+            // parse guide
 		 	if ($package->guide->reference instanceof \SimpleXMLElement) {
 		 		foreach ($package->guide->reference as $reference) {
 		 			$this->guide[] = array(
@@ -223,13 +545,17 @@ namespace Epub
 		 */
 		public function asXML($xmlFile)
 		{
-			$xmlPath = \dirname($xmlFile) . DIRECTORY_SEPARATOR;
+			// shortcut
+			$ds = \DIRECTORY_SEPARATOR;
+			
+			$xmlPath = \dirname($xmlFile) . $ds;
 			if (false === \is_dir($xmlPath) && false === @ \mkdir($xmlPath)) {
-				throw new \Exception('Cannot create directory "' . $xmlPath . '" due to unknown reason.');
+				throw new Exception('Cannot create directory "' . $xmlPath . '" due to unknown reason.');
 			}
 			
 			$xmlStr = '<?xml version="1.0" encoding="UTF-8"?>' . PHP_EOL . 
 					  '<package version="' . $this->version . '" xmlns="http://www.idpf.org/2007/opf" ' . 
+					  'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' . 
 				      'unique-identifier="' . $this->uid . '">';
 			
 			// metadata
@@ -238,23 +564,23 @@ namespace Epub
 			foreach ($this->metadata as $key => $item) {
 				if ($key === 'meta') {
 					foreach ($item as $name => $content) {
-						$xmlStr .= '<meta name="' . $name . '" content="' . htmlentities($content) . '" />';
+						$xmlStr .= '<meta name="' . $name . '" content="' . \htmlspecialchars($content, \ENT_COMPAT, 'UTF-8') . '" />';
 					}
 				} else {
 					$xmlStr .= '<' . $key;
 					if (true === isset($item['attrs'])) {
 						foreach ($item['attrs'] as $name => $value) {
-							$xmlStr .= ' ' . $name . '="' . htmlentities($value) . '"';
+							$xmlStr .= ' ' . $name . '="' . \htmlspecialchars($value, \ENT_COMPAT, 'UTF-8') . '"';
 						}
 					}
-					$xmlStr .= $item['value'] === '' ? ' />' : '>' .  htmlentities($item['value']) . '</' . $key . '>';
+					$xmlStr .= $item['value'] === '' ? ' />' : '>' .  \htmlspecialchars($item['value'], \ENT_COMPAT, 'UTF-8') . '</' . $key . '>';
 				}
 			}
 			$xmlStr .= '</metadata>';
 			
 			// manifest
 			if (empty($this->manifest)) {
-				throw new \Exception('The manifest element must contain one or more item elements.');
+				throw new Exception('The manifest element must contain one or more item elements.');
 			}
 			$hrefs2ids = array();
 			$xmlStr .= '<manifest>';
@@ -263,11 +589,11 @@ namespace Epub
 					|| false === isset($item['href'])
 					|| false === isset($item['media-type'])
 				) {
-					throw new \Exception('Each item element contained within a manifest element must ' . 
+					throw new Exception('Each item element contained within a manifest element must ' . 
 						'have the attributes id, href and media-type');
 				}
-				if (false === isset($item['file']) || false === is_file($item['file'])) {
-					throw new \Exception('Missing file associated with manifest item with id ' . $item['id']);
+				if (false === isset($item['file']) || false === \is_file($item['file'])) {
+					throw new Exception('Missing file associated with manifest item with id ' . $item['id']);
 				}
 				$hrefs2ids[$item['href']] = $id;
 				$xmlStr .= '<item id="' . $id . '" href="' . $item['href'] . '"';
@@ -285,20 +611,20 @@ namespace Epub
 				}
 				$xmlStr    .= ' media-type="' . $item['media-type'] . '" />';
 				$targetPath = \dirname($xmlPath . $item['href']);
-				if (false === \is_dir($targetPath) && false === @ mkdir($targetPath)) {
-					throw new \Exception('Cannot create directory "' . $targetPath . 
+				if (false === \is_dir($targetPath) && false === @ \mkdir($targetPath)) {
+					throw new Exception('Cannot create directory "' . $targetPath . 
 						'" due to unknown reason.');
 				}
 				if (false === @ \copy($item['file'], $xmlPath . $item['href'])) {
-					throw new \Exception('Cannot copy file "' . $item['file'] . 
+					throw new Exception('Cannot copy file "' . $item['file'] . 
 						'" to "' . $xmlPath . $item['href'] . '" due to unknown reason.');
 				}
 			}
 			$xmlStr .= '</manifest>';
 			
 			// spine
-			if (empty($this->spine)) {
-				throw new \Exception('The spine element must contain one or more itemref elements.');
+			if (true === empty($this->spine)) {
+				throw new Exception('The spine element must contain one or more itemref elements.');
 			}
 			$xmlStr .= '<spine';
 			if (true === isset($this->manifest['ncx'])) {
@@ -307,7 +633,7 @@ namespace Epub
 			$xmlStr .= '>';
 			foreach ($this->spine as $key => $item) {
 				if (false === isset($this->manifest[$key])) {
-					throw new \Exception('Reference to a nonexistant content document: ' . $key);
+					throw new Exception('Reference to a nonexistant content document: ' . $key);
 				}
 				$xmlStr .= '<itemref idref="' . $key . '"';
 				if (true === isset($item['linear'])) {
@@ -322,7 +648,7 @@ namespace Epub
 				$xmlStr .= '<guide>';
 				foreach ($this->guide as $item) {
 					if (false === isset($hrefs2ids[$item['href']])) {
-						throw new \Exception('Guide element is not referenced in the manifest: ' . 
+						throw new Exception('Guide element is not referenced in the manifest: ' . 
 							$item['href']);
 					}
 					$xmlStr .= '<reference type="' . $item['type'] . 
@@ -332,14 +658,96 @@ namespace Epub
 				$xmlStr .= '</guide>';
 			}
 			$xmlStr .= '</package>';
-file_put_contents('opf.xml', $xmlStr);
-			XML::loadString($xmlStr)->asXML($xmlFile);
+
+			XML::loadString($xmlStr, __DIR__ . $ds . 'Schema' . $ds . 'opf.rng')->asXML($xmlFile);
+			
 			if ($this->ncx) {
 				if (false === isset($this->manifest['ncx']) 
 					|| true === empty($this->manifest['ncx']['href'])) {
-					throw new \Exception('Cannot determine filename of the NCX');
+					throw new Exception('Cannot determine filename of the NCX');
 				}
-				$this->ncx->asXML(dirname($xmlFile) . DIRECTORY_SEPARATOR . $this->manifest['ncx']['href']);
+				$this->ncx->asXML(\dirname($xmlFile) . $ds . $this->manifest['ncx']['href']);
+			}
+		}
+		
+		/**
+		 * Increase refcount for given file
+		 * 
+		 * @param string $file   Path to the file
+		 * @param string $usedBy Path to the file where first file is used by
+		 * 
+		 * @return void
+		 */
+		protected function addRefCount($file, $usedBy = null)
+		{
+			if (false === isset($this->fileRefCounter[$file])) {
+				$this->fileRefCounter[$file] = 0;
+			}
+			$this->fileRefCounter[$file]++;
+			if (null !== $usedBy) {
+				if (false === isset($this->fileUsage[$usedBy])) {
+					$this->fileUsage[$usedBy] = array();
+				}
+				$this->fileUsage[$usedBy][] = $file;
+			}
+		}
+
+		/**
+		 * Decrease refcount for given file
+		 * 
+		 * @param string $file Path to the file
+		 * @param string $usedBy Path to the file where first file is used by
+		 * 
+		 * @return void
+		 */
+		protected function delRefCount($file, $usedBy = null)
+		{
+			if (false === isset($this->fileRefCounter[$file])) {
+				return;
+			}
+			$this->fileRefCounter[$file]--;
+			if ($this->fileRefCounter[$file] <= 0) {
+				unset($this->fileRefCounter[$file]);
+			}
+			if (null !== $usedBy) {
+				if (false === isset($this->fileUsage[$usedBy])) {
+					return;
+				}
+				foreach ($this->fileUsage[$usedBy] as $key => $val) {
+					if ($val === $file) {
+						unset($this->fileUsage[$usedBy][$key]);
+						if (0 === count($this->fileUsage[$usedBy])) {
+							unset($this->fileUsage[$usedBy]);
+						}
+						return;
+					}
+				}
+			}
+		}
+		
+		/**
+		 * Get mimetype of the give file
+		 * 
+		 * @param string $file
+		 * 
+		 * @return string
+		 */
+		public static function getMimetype($file)
+		{
+			static $finfo;
+			if (false === ($finfo instanceof \FInfo)) {
+				$finfo = new \Finfo(\FILEINFO_MIME_TYPE);
+			}
+			switch (\strtolower(substr($file, -4))) {
+				case '.ttf':
+					return 'application/x-font-ttf';
+					break;
+				case '.css':
+					return 'text/css';
+					break;
+				default:
+					return $finfo->file($file);
+					break;
 			}
 		}
 	}	

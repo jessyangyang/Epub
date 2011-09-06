@@ -43,8 +43,10 @@
  */
 namespace Epub
 {
-	require_once __DIR__ . DIRECTORY_SEPARATOR . 'XML.php';
-	require_once __DIR__ . DIRECTORY_SEPARATOR . 'OPF.php';
+	require_once __DIR__ . \DIRECTORY_SEPARATOR . 'XML.php';
+	require_once __DIR__ . \DIRECTORY_SEPARATOR . 'OPF.php';
+	
+	use Exception;
 	
 	/**
 	 * OCF container class
@@ -65,43 +67,67 @@ namespace Epub
 		protected $rootFiles = array();
 		
 		/**
+		 * Container for OPF instance
+		 * @var \Epub\OPF
+		 */
+		protected $opf;
+		
+		/**
 		 * Constructor.
 		 * 
 		 * @param string $xmlFile XML file
+		 * @param string $strict  Do not tolerate epub errors
 		 */
-		public function __construct($xmlFile = null)
+		public function __construct($xmlFile = null, $strict = true)
 		{
 			if ($xmlFile !== null) {
-				
-				$this->readXML($xmlFile);
-				
+				$this->readXML($xmlFile, $strict);
 			} else {
-				
+				$this->rootFiles[] = array(
+					'full-path'  => 'META-INF/container.xml',
+					'media-type' => 'application/oebps-package+xml'
+				);
+				$this->opf = new OPF();
 			}
+		}
+		
+		/**
+		 * Getter for protected properties
+		 * 
+		 * 
+		 */
+		public function __get($name)
+		{
+			return true === isset($this->{$name}) ? $this->{$name} : null;
 		}
 		
 		/**
 		 * Read existing package XML file
 		 * 
 		 * @param string $xmlFile XML file
+		 * @param string $strict  Do not tolerate epub errors
 		 * 
 		 * @return void
 		 */
-		protected function readXML($xmlFile)
+		protected function readXML($xmlFile, $strict = true)
 		{
-			$container = XML::loadFile($xmlFile);
+			// shortcut
+			$ds = \DIRECTORY_SEPARATOR;
+			
+			$container = XML::loadFile($xmlFile, __DIR__ . $ds . 'Schema' . $ds . 'container.rng');
 			foreach ($container->rootfiles->rootfile as $item) {
 				$rootFile = array(
 					'full-path'  => XML::getAttr($item, 'full-path'),
 					'media-type' => XML::getAttr($item, 'media-type')
 				);
-				if (false === \is_file(\dirname($xmlFile) . DIRECTORY_SEPARATOR . 
-					'..' . DIRECTORY_SEPARATOR . $rootFile['full-path'])) {
-					throw new \Exception('Rootfile "' . $rootFile['full-path'] . '" does not exist');
+				if (false === \is_file(\dirname($xmlFile) . $ds . '..' . $ds . $rootFile['full-path'])) {
+					throw new Exception('Rootfile "' . $rootFile['full-path'] . '" does not exist');
 				}
 				if ($rootFile['media-type'] === 'application/oebps-package+xml') {
-					$rootFile['opf'] = new OPF(\dirname($xmlFile) . DIRECTORY_SEPARATOR . 
-						'..' . DIRECTORY_SEPARATOR . $rootFile['full-path']);
+					$this->opf = new OPF(
+						\dirname($xmlFile) . $ds . '..' . $ds . $rootFile['full-path'],
+						$strict
+					);
 				}
 				$this->rootFiles[] = $rootFile;
 			}
@@ -116,18 +142,21 @@ namespace Epub
 		 */
 		public function asXML($rootPath)
 		{
+			// shortcut 
+			$ds = \DIRECTORY_SEPARATOR;
+			
 			if (true === empty($this->rootFiles)) {
-				throw new \Exception('Rootfiles container cannot be empty');
+				throw new Exception('Rootfiles container cannot be empty');
 			}
 			if (false === \is_dir($rootPath)) {
-				throw new \Exception('Directory "' . $rootPath . '" does not exist.');
+				throw new Exception('Directory "' . $rootPath . '" does not exist.');
 			}
 			if (false === \is_writable($rootPath)) {
-				throw new \Exception('Directory "' . $rootPath . '" is nor writable.');
+				throw new Exception('Directory "' . $rootPath . '" is nor writable.');
 			}
 			if (false === \is_dir($rootPath . '/META-INF') 
-				&& false === @ \mkdir($rootPath . DIRECTORY_SEPARATOR . 'META-INF')) {
-				throw new \Exception('Cannot create directory "' . $rootPath . DIRECTORY_SEPARATOR . 
+				&& false === @ \mkdir($rootPath . $ds . 'META-INF')) {
+				throw new Exception('Cannot create directory "' . $rootPath . $ds . 
 					'META-INF" due to unknown reason.');
 			}
 			$xmlStr = '<?xml version="1.0" encoding="UTF-8"?>' . 
@@ -135,25 +164,26 @@ namespace Epub
 					  '<rootfiles>';
 			foreach ($this->rootFiles as $rootFile) {
 				if (false === isset($rootFile['full-path'])) {
-					throw new \Exception('Missing "full-path" in rootfile.');
+					throw new Exception('Missing "full-path" in rootfile.');
 				}
 				if (false === isset($rootFile['media-type'])) {
-					throw new \Exception('Missing "media-type" in rootfile.');
+					throw new Exception('Missing "media-type" in rootfile.');
 				}
 				if ($rootFile['media-type'] === 'application/oebps-package+xml') {
-					if (false === isset($rootFile['opf']) || false === ($rootFile['opf'] instanceof OPF)) {
-						throw new \Exception('Missing instance of \Eoub\OPF for rootfile with full-path ' . 
+					if (false === ($this->opf instanceof OPF)) {
+						throw new Exception('Missing instance of \Epub\OPF for rootfile with full-path ' . 
 							$rootFile['full-path']);
 					}
-					$rootFile['opf']->asXML($rootPath . DIRECTORY_SEPARATOR . $rootFile['full-path']);
+					$this->opf->asXML($rootPath . $ds . $rootFile['full-path']);
 				}
 				$xmlStr .= '<rootfile full-path="' . $rootFile['full-path'] . 
 					'" media-type="' . $rootFile['media-type'] . '" />';
 			}
 			$xmlStr .= '</rootfiles></container>';
 			
-			XML::loadString($xmlStr)->asXML($rootPath . DIRECTORY_SEPARATOR . 'META-INF' . 
-				DIRECTORY_SEPARATOR . 'container.xml');
+			XML::loadString($xmlStr, __DIR__ . '/Schema/container.rng')->asXML(
+				$rootPath . $ds . 'META-INF' . $ds . 'container.xml'
+			);
 		}
 	}
 }

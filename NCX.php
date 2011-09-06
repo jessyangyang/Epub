@@ -43,7 +43,9 @@
  */
 namespace Epub
 {
-	require_once __DIR__ . DIRECTORY_SEPARATOR . 'XML.php';
+	require_once __DIR__ . \DIRECTORY_SEPARATOR . 'XML.php';
+	
+	use Exception;
 	
 	/**
 	 * Navigation Center eXtended (NCX) class
@@ -72,12 +74,6 @@ namespace Epub
 		protected $docAuthor = array();
 		
 		/**
-		 * Navigation map
-		 * @var array
-		 */
-		protected $navMap = array();
-		
-		/**
 		 * Page list
 		 * @var array
 		 */
@@ -90,32 +86,142 @@ namespace Epub
 		protected $navList = array();
 		
 		/**
+		 * Mapping table (navPoint id to scr)
+		 * @var array
+		 */
+		protected $navId2src = array();
+		
+		/**
+		 * Mapping table (navPoint id to navPoint)
+		 * @var array
+		 */
+		protected $navId2navPoint = array();
+		
+		/**
+		 * Mapping table (navPoint id to parent navPoint id)
+		 * @var array
+		 */
+		protected $parents = array();
+		
+		/**
+		 * Mapping table (child ids of the navPoint)
+		 * @var array
+		 */
+		protected $childs = array();
+		
+		/**
 		 * Constructor
 		 * 
 		 * @param string $xmlFile XML file
+		 * @param string $strict  Do not tolerate epub errors
 		 */
-		public function __construct($xmlFile = null)
+		public function __construct($xmlFile = null, $strict = true)
 		{
 			if ($xmlFile !== null) {
-				
-				$this->readXML($xmlFile);
-				
+				$this->readXML($xmlFile, $strict);
 			} else {
-				
-				
+				// what?
 			}
+		}
+		
+		/**
+		 * Get protected properties
+		 * 
+		 * @param string $name Property name
+		 * 
+		 * @return mixed value
+		 */
+		public function __get($name)
+		{
+			return true === isset($this->{$name}) ? $this->{$name} : null;
+		}
+		
+		/**
+		 * Get navPoint by id
+		 * 
+		 * @param string $id NavPoint id
+		 * 
+		 * @return array
+		 */
+		public function getNavPoint($id)
+		{
+			$retval = false;
+			if (true === isset($this->navId2navPoint[$id])) {
+				$retval = array();
+				$navPoint = $this->navId2navPoint[$id];
+				foreach ($this->navId2navPoint[$id] as $key => $val) {
+					if (true === is_scalar($val)) {
+						$retval[$key] = $val;
+					}
+				}
+				$retval['parent'] = true === isset($this->parents[$id]) ? $this->parents[$id] : null;
+			}
+			return $retval;
+		}
+		
+		/**
+		 * Add nav point
+		 * 
+		 * @param string $id       Identifier of the navigation  point
+		 * @param string $label    Label of the navigation  point
+		 * @param string $href     Path to the file
+		 * @param string $parentId Identifier of the parent navigation point
+		 * 
+		 * @return href of the previous navigation point
+		 */
+		public function addNavPoint($id, $label, $href, $parentId = null)
+		{
+			if (true === isset($this->navId2navPoint[$id])) {
+				throw new Exception('Nav point with id "' . $id . '" already exists.');
+			}
+			if (null !== $parentId) {
+				if (false === isset($this->navId2navPoint[$parentId])) {
+					throw new Exception('Parent Nav point with id "' . $parentId . '" does not exist.');
+				}
+			}
+			$tmp = array_keys($this->navId2navPoint);
+			$lastNavPoint = $this->navId2navPoint[$tmp[count($tmp) - 1]];
+			$item = array(
+				'id'        => $id,
+				'playOrder' => $lastNavPoint['playOrder'] + 1,
+				'class'     => '',
+				'navLabel'  => trim($label),
+				'content'   => $href,
+			);
+			$this->navId2src[$item['id']] = $item['content'];
+			$retval = false;
+			if (null !== $parentId) {
+				if (false === isset($this->childs[$parentId])) {
+					$this->childs[$parentId] = array();
+				}
+				$this->parents[$item['id']] = $parentId;
+				$this->childs[$parentId][] = $item['id'];
+				$prev = count($this->childs[$parentId]) - 2;
+				if (0 > $prev) {
+					$prevId = $parentId;
+				} else {
+					$prevId = $this->childs[$parentId][$prev];
+				}
+				$retval = $this->navId2src[$prevId];
+			}
+			$this->navId2navPoint[$item['id']] = $item;
+			return $retval;
 		}
 		
 		/**
 		 * Read existing package XML file
 		 * 
 		 * @param string $xmlFile XML file
+		 * @param string $strict  Do not tolerate epub errors
 		 * 
 		 * @return void
 		 */
-		protected function readXML($xmlFile)
+		protected function readXML($xmlFile, $strict = true)
 		{
-			$ncx = XML::loadFile($xmlFile);
+			// shortcut
+			$ds = \DIRECTORY_SEPARATOR;
+			
+			$ncx = XML::loadFile($xmlFile, __DIR__ . $ds . 'Schema' . $ds . 'ncx.rng');
 
 			if (true === isset($ncx->head->meta)) {
 				foreach ($ncx->head->meta as $item) {
@@ -136,9 +242,9 @@ namespace Epub
 			}
 
 			foreach ($ncx->navMap->navPoint as $navPoint) {
-				$this->navMap[] = $this->parseNavPoint($navPoint);
+				$this->parseNavPoints($navPoint);
 			}
-			
+
 			if (true === isset($ncx->pageList)) {
 				foreach ($ncx->pageList->pageTarget as $pageTarget) {
 					$this->pageList[] = array(
@@ -172,13 +278,16 @@ namespace Epub
 		 * 
 		 * @param string $xmlFile File name of XML file. 
 		 * 
-		 * @return string
+		 * @return void
 		 */
 		public function asXML($xmlFile)
 		{
-			$xmlPath = \dirname($xmlFile) . DIRECTORY_SEPARATOR;
+			// shortcut
+			$ds = \DIRECTORY_SEPARATOR;
+			
+			$xmlPath = \dirname($xmlFile) . $ds;
 			if (false === \is_dir($xmlPath) && false === @ \mkdir($xmlPath)) {
-				throw new \Exception('Cannot create directory "' . $xmlPath . '" due to unknown reason.');
+				throw new Exception('Cannot create directory "' . $xmlPath . '" due to unknown reason.');
 			}
 			
 			$xmlStr = '<?xml version="1.0" encoding="UTF-8"?>' . PHP_EOL . 
@@ -207,8 +316,11 @@ namespace Epub
 			}
 			
 			$xmlStr .= '<navMap>';
-			foreach ($this->navMap as $navPoint) {
-				$xmlStr .= $this->navPoint2Xml($navPoint);
+			foreach ($this->navId2src as $navPointId => $src) {
+				if (false === isset($this->navId2navPoint[$navPointId])) {
+					throw new Exception('NavPoint with Id ' . $navPointId . ' doe not exists');
+				}
+				$xmlStr .= $this->navPoint2Xml($this->navId2navPoint[$navPointId]);
 			}
 			$xmlStr .= '</navMap>';
 			
@@ -216,16 +328,16 @@ namespace Epub
 				$xmlStr .= '<pageList>';
 				foreach ($this->pageList as $pageTarget) {
 					if (false === isset($pageTarget['type'])) {
-						throw new \Exception('Missing required element "type" within pageTarget');
+						throw new Exception('Missing required element "type" within pageTarget');
 					}
 				 	if (false === isset($pageTarget['playOrder'])) {
-						throw new \Exception('Missing required element "playOrder" within pageTarget');
+						throw new Exception('Missing required element "playOrder" within pageTarget');
 					}
 					if (false === isset($pageTarget['navLabel'])) {
-						throw new \Exception('Missing required element "navLabel" within pageTarget');
+						throw new Exception('Missing required element "navLabel" within pageTarget');
 					}
 					if (false === isset($pageTarget['content'])) {
-						throw new \Exception('Missing required element "content" within pageTarget');
+						throw new Exception('Missing required element "content" within pageTarget');
 					}
 					$xmlStr .= '<pageTarget type="' . $pageTarget['id'] . 
 						'" playOrder="' . $pageTarget['playOrder'] . '"';
@@ -249,16 +361,16 @@ namespace Epub
 				$xmlStr .= '<navList>';
 				foreach ($this->navList as $navTarget) {
 					if (false === isset($navTarget['id'])) {
-						throw new \Exception('Missing required element "id" within navTarget');
+						throw new Exception('Missing required element "id" within navTarget');
 					}
 				 	if (false === isset($pageTarget['playOrder'])) {
-						throw new \Exception('Missing required element "playOrder" within navTarget');
+						throw new Exception('Missing required element "playOrder" within navTarget');
 					}
 					if (false === isset($pageTarget['navLabel'])) {
-						throw new \Exception('Missing required element "navLabel" within navTarget');
+						throw new Exception('Missing required element "navLabel" within navTarget');
 					}
 					if (false === isset($pageTarget['content'])) {
-						throw new \Exception('Missing required element "content" within navTarget');
+						throw new Exception('Missing required element "content" within navTarget');
 					}
 					$xmlStr .= '<navTarget id="' . $pageTarget['id'] . 
 						'" playOrder="' . $pageTarget['playOrder'] . '"';
@@ -276,17 +388,17 @@ namespace Epub
 			}
 			$xmlStr .= '</ncx>';
 
-			XML::loadString($xmlStr)->asXML($xmlFile);
+			XML::loadString($xmlStr, __DIR__ . $ds . 'Schema' . $ds . 'ncx.rng')->asXML($xmlFile);
 		}
 		
 		/**
 		 * Parse single navPoint and its children
 		 * 
-		 * @param \SimpleXMLElemen $navPoint
+		 * @param array|\SimpleXMLElemen $navPoint
 		 * 
-		 * @return array
+		 * @return void
 		 */
-		protected function parseNavPoint(\SimpleXMLElement $navPoint)
+		protected function parseNavPoints(\SimpleXMLElement $navPoint, $parentId = null)
 		{
 			$item = array(
 				'id'        => XML::getAttr($navPoint, 'id'),
@@ -295,9 +407,20 @@ namespace Epub
 				'navLabel'  => trim($navPoint->navLabel->text),
 				'content'   => XML::getAttr($navPoint->content, 'src'),
 			);
+			$this->navId2src[$item['id']] = $item['content'];
 			if (true === isset($navPoint->navPoint)) {
-				$item['navPoint'] = $this->parseNavPoint($navPoint->navPoint);
+				foreach ($navPoint->navPoint as $_navPoint) {
+					$this->parseNavPoints($_navPoint, $item['id']);
+				}
 			}
+			if (null !== $parentId) {
+				$this->parents[$item['id']] = $parentId;
+				if (false === isset($this->childs[$parentId])) {
+					$this->childs[$parentId] = array();
+				}
+				$this->childs[$parentId][] = $item['id'];
+			}
+			$this->navId2navPoint[$item['id']] = $item;
 			return $item;
 		}
 		
@@ -310,21 +433,34 @@ namespace Epub
 		 */
 		protected function navPoint2Xml(array $navPoint)
 		{
+			static $added;
+			if (null === $added) {
+				$added = array();
+			}
+			if (true === isset($added[$navPoint['id']])) {
+				return '';
+			}
+			$added[$navPoint['id']] = true;
 			$retval = '<navPoint playOrder="' . $navPoint['playOrder'] . '" id="' . $navPoint['id'] . '"';
 			if (true === isset($navPoint['class']) && false === empty($navPoint['class'])) {
 				$retval .= ' class="' . $navPoint['class'] . '"';
 			}
 			$retval .= '>';
 			if (false === isset($navPoint['navLabel'])) {
-				throw new \Exception('Missing required element "navLabel" within navPoint');
+				throw new Exception('Missing required element "navLabel" within navPoint');
 			}
 			$retval .= '<navLabel><text>' . $navPoint['navLabel'] . '</text></navLabel>';
 			if (false === isset($navPoint['content'])) {
-				throw new \Exception('Missing required element "content" within navPoint');
+				throw new Exception('Missing required element "content" within navPoint');
 			}
 			$retval .= '<content src="' . $navPoint['content'] . '" />';
-			if (true === isset($navPoint['navPoint'])) {
-				$retval .= $this->navPoint2Xml($navPoint['navPoint']);
+			if (true === isset($this->childs[$navPoint['id']])) {
+				foreach ($this->childs[$navPoint['id']] as $navPointId) {
+					if (false === isset($this->navId2navPoint[$navPointId])) {
+						throw new Exception('NavPoint with Id ' . $navPointId . ' doe not exists');
+					}
+					$retval .= $this->navPoint2Xml($this->navId2navPoint[$navPointId]);
+				}
 			}
 			$retval .= '</navPoint>';
 			return $retval;
