@@ -43,10 +43,10 @@
  */
 namespace Epub
 {
-	use DOMDocument;
-	use Exception;
+    use DOMDocument;
+    use Exception;
 
-	\libxml_use_internal_errors(true);
+    \libxml_use_internal_errors(true);
 
     /**
      * XML helper class
@@ -88,47 +88,44 @@ namespace Epub
          */
         public static function loadString($xmlString, $schema = null)
         {
-        	if (false !== strpos($xmlString, 'http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd')) {
-        		$xmlString = str_replace(
-        			'http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd',
-        			__DIR__ . '/Schema/dtd/xhtml/xhtml11.dtd',
-        			$xmlString
-        		);
-        	}
+            if (false !== strpos($xmlString, 'http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd')) {
+                $xmlString = str_replace(
+                    'http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd',
+                    __DIR__ . '/Schema/dtd/xhtml/xhtml11.dtd',
+                    $xmlString
+                );
+            }
 
-        	$xdoc = new DOMDocument();
-       		if (false === $xdoc->loadXML($xmlString, \LIBXML_NSCLEAN | \LIBXML_NOCDATA | \LIBXML_DTDLOAD)
-				|| false !== libxml_get_last_error()) {
-				self::raiseError();
-			}
+            $xdoc = new DOMDocument();
+            if (false === $xdoc->loadXML($xmlString, \LIBXML_NSCLEAN | \LIBXML_NOCDATA | \LIBXML_DTDLOAD)
+                || false !== libxml_get_last_error()) {
+                self::raiseError();
+            }
 
-        	if ($schema !== null) {
-				if (false === is_file($schema)) {
-					throw new Exception('Schema file "' . $schema . '" does not exist');
-				}
-				if (false === is_readable($schema)) {
-					throw new Exception('Schema file "' . $schema . '" does not readable');
-				}
-			}
+            if ($schema !== null) {
+                if (false === is_file($schema)) {
+                    throw new Exception('Schema file "' . $schema . '" does not exist');
+                }
+                if (false === is_readable($schema)) {
+                    throw new Exception('Schema file "' . $schema . '" does not readable');
+                }
+                switch  (strtolower(substr($schema, -4, 4))) {
+                    case '.xsd':
+                        $valid = $xdoc->schemaValidate($schema);
+                        break;
+                    case '.dtd':
+                        $valid = $xdoc->validate($schema);
+                        break;
+                    case '.rng':
+                        $valid = $xdoc->relaxNGValidate($schema);
+                        break;
+                }
+                if (false === $valid) {
+                    self::raiseError();
+                }
+            }
 
-			if ($schema !== null) {
-				switch  (strtolower(substr($schema, -4, 4))) {
-					case '.xsd':
-						$valid = $xdoc->schemaValidate($schema);
-						break;
-					case '.dtd':
-						$valid = $xdoc->validate($schema);
-						break;
-					case '.rng':
-						$valid = $xdoc->relaxNGValidate($schema);
-						break;
-				}
-				if (false === $valid) {
-					self::raiseError();
-				}
-			}
-
-        	return \simplexml_import_dom($xdoc);
+            return \simplexml_import_dom($xdoc);
         }
 
         /**
@@ -141,28 +138,84 @@ namespace Epub
          */
         public static function loadFile($xmlFile, $schema = null)
         {
-			if (false === is_file($xmlFile)) {
-				throw new Exception('XML file "' . $xmlFile . '" does not exist');
-			}
+            if (false === is_file($xmlFile)) {
+                throw new Exception('XML file "' . $xmlFile . '" does not exist');
+            }
 
-			if (false === is_readable($xmlFile)) {
-				throw new Exception('XML file "' . $xmlFile . '" does not readable');
-			}
+            if (false === is_readable($xmlFile)) {
+                throw new Exception('XML file "' . $xmlFile . '" does not readable');
+            }
 
-			if ($schema !== null) {
-				if (false === is_file($schema)) {
-					throw new Exception('Schema file "' . $schema . '" does not exist');
-				}
-				if (false === is_readable($schema)) {
-					throw new Exception('Schema file "' . $schema . '" does not readable');
-				}
-			}
+            if ($schema !== null) {
+                if (false === is_file($schema)) {
+                    throw new Exception('Schema file "' . $schema . '" does not exist');
+                }
+                if (false === is_readable($schema)) {
+                    throw new Exception('Schema file "' . $schema . '" does not readable');
+                }
+            }
 
-			try {
-				return self::loadString(file_get_contents($xmlFile), $schema);
-			} catch (\Exception $e) {
-				throw new Exception('File "' . $xmlFile . '": ' . PHP_EOL . $e->getMessage());
-			}
+            try {
+                return self::loadString(file_get_contents($xmlFile), $schema);
+            } catch (\Exception $e) {
+                throw new Exception('File "' . $xmlFile . '": ' . PHP_EOL . $e->getMessage());
+            }
+        }
+
+        /**
+         * Convert XML represented by instance of SimpleXMLElement to PHP
+         *
+         * @param mixed $value Instance of SimpleXMLElement
+         *
+         * @return mixed PHP value
+         */
+        public static function xml2php($value)
+        {
+            if ($value instanceof \SimpleXMLElement) {
+                if (false === empty($value)) {
+                    $value = (array)$value;
+                    foreach ($value as $k => $v) {
+                        // ignore comments
+                        if ($k === 'comment') {
+                            if (true === is_array($v)) {
+                                reset($v);
+                                $elem = current($v);
+                            } else {
+                                $elem = $v;
+                            }
+                            if ($elem instanceof \SimpleXMLElement
+                                && false !== strpos($elem->asXML(), '<!--')) {
+                                unset($value[$k]);
+                                continue;
+                            }
+                        }
+
+                        if (true === is_array($v) && 1 === count($value)) {
+                            $value = $v;
+                            foreach ($value as $_k => $_v) {
+                                // ignore comments
+                                if ($_k === 'comment') {
+                                    if (true === is_array($_v)) {
+                                        reset($_v);
+                                        $elem = current($_v);
+                                    } else {
+                                        $elem = $_v;
+                                    }
+                                    if ($elem instanceof \SimpleXMLElement
+                                        && false !== strpos($elem->asXML(), '<!--')) {
+                                        unset($value[$_k]);
+                                        continue;
+                                    }
+                                }
+                                $value[$_k] = self::xml2php($_v);
+                            }
+                            break;
+                        }
+                        $value[$k] = self::xml2php($v);
+                    }
+                }
+            }
+            return $value;
         }
 
         /**
@@ -173,15 +226,15 @@ namespace Epub
          */
         protected static function raiseError()
         {
-        	$errorMessage = '';
-        	foreach (\libxml_get_errors() as $error) {
-        		$errorMessage .= trim($error->message) . ' on line ' . $error->line . ':' . $error->column;
-        		if ($error->file) {
-        			$errorMessage .= ' in file ' . $error->file;
-        		}
-        		$errorMessage .= PHP_EOL;
-        	}
-        	throw new Exception($errorMessage);
+            $errorMessage = '';
+            foreach (\libxml_get_errors() as $error) {
+                $errorMessage .= trim($error->message) . ' on line ' . $error->line . ':' . $error->column;
+                if ($error->file) {
+                    $errorMessage .= ' in file ' . $error->file;
+                }
+                $errorMessage .= PHP_EOL;
+            }
+            throw new Exception($errorMessage);
         }
     }
 }
