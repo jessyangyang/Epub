@@ -45,9 +45,9 @@ namespace Epub
 {
 	require_once __DIR__ . \DIRECTORY_SEPARATOR . 'XML.php';
 	require_once __DIR__ . \DIRECTORY_SEPARATOR . 'NCX.php';
-	
+
 	use Exception;
-	
+
 	class OPF
 	{
 		/**
@@ -55,70 +55,70 @@ namespace Epub
 		 * @var string
 		 */
 		protected $uid;
-		
+
 		/**
 		 * Version of the package.
 		 * @var string
 		 */
 		protected $version = '2.0';
-		
+
 		/**
 		 * Publication metadata (title, author, publisher, etc.).
 		 * @var array
 		 */
 		protected $metadata;
-		
+
 		/**
-		 * A list of files (documents, images, style sheets, etc.) that make up the publication. 
-		 * The manifest also includes fallback declarations for files of types not supported by 
+		 * A list of files (documents, images, style sheets, etc.) that make up the publication.
+		 * The manifest also includes fallback declarations for files of types not supported by
 		 * this specification.
 		 * @var array
 		 */
 		protected $manifest = array();
-		
+
 		/**
 		 * An arrangement of documents providing a linear reading order.
 		 * @var array
 		 */
 		protected $spine = array();
-		
+
 		/**
-		 * A set of references to fundamental structural features of the publication, such as 
-		 * table of contents, foreword, bibliography, etc. 
+		 * A set of references to fundamental structural features of the publication, such as
+		 * table of contents, foreword, bibliography, etc.
 		 * @var array
 		 */
 		protected $guide = array();
-		
+
 		/**
 		 * Navigation Control file for XML
 		 * @var \Epub\NCX
 		 */
 		protected $ncx;
-		
+
 		/**
 		 * Container for refcounting of the files
 		 * @var array
 		 */
 		protected $fileRefCounter = array();
-		
+
 		/**
 		 * Container for the file usage
 		 * @var array
 		 */
 		protected $fileUsage = array();
-		
+
 		/**
 		 * href to id map
 		 * @var array
 		 */
 		protected $href2id = array();
-		
+
 		/**
 		 * Constructor.
-		 * 
+		 *
 		 * @param string $xmlFile XML file
 		 * @param string $strict  Do not tolerate epub errors
-		 * 
+		 *
 		 */
 		public function __construct($xmlFile = null, $strict = true)
 		{
@@ -151,36 +151,36 @@ namespace Epub
 
 		/**
 		 * Get protected properties
-		 * 
+		 *
 		 * @param string $name Property name
-		 * 
+		 *
 		 * @return mixed value
 		 */
 		public function __get($name)
 		{
 			return true === isset($this->{$name}) ? $this->{$name} : null;
 		}
-		
+
 		/**
 		 * Get metadata
-		 * 
+		 *
 		 * @param string $meta   Meta name
 		 * @param string $prefix Namespace
-		 * 
+		 *
 		 */
 		public function getMetadata($meta, $prefix = 'dc')
 		{
 			$key = $prefix . ':' . $meta;
 			return isset($this->metadata[$key]) ? $this->metadata[$key] : false;
 		}
-		
+
 		/**
 		 * Set metadata
-		 * 
+		 *
 		 * @param string $meta  Meta name
 		 * @param string $value Value
 		 * @param string $role  Role
-		 * 
+		 *
 		 */
 		public function setMetadata($meta, $value , array $attrs = array(), $prefix = 'dc')
 		{
@@ -190,26 +190,26 @@ namespace Epub
 				'attrs' => $attrs
 			);
 		}
-		
+
 		/**
 		 * Get manifest by identifier
-		 * 
+		 *
 		 * @param string $id Manifest identifier
-		 * 
-		 * @return array 
+		 *
+		 * @return array
 		 */
 		public function getManifestById($id)
 		{
-			return null === $id ? 
+			return null === $id ?
 				$this->manifest : (true === isset($this->manifest[$id]) ? $this->manifest[$id] : null);
 		}
-		
+
 		/**
 		 * Get manifest by href
-		 * 
+		 *
 		 * @param string $href Manifest identifier
-		 * 
-		 * @return array 
+		 *
+		 * @return array
 		 */
 		public function getManifestByHref($href)
 		{
@@ -219,21 +219,21 @@ namespace Epub
 				}
 			}
 		}
-		
+
 		/**
 		 * Get spine.
-		 * 
-		 * @return array 
+		 *
+		 * @return array
 		 */
 		public function getSpine()
 		{
 			return $this->spine;
 		}
-		
+
 		/**
-		 * Set spine 
-		 * 
-		 * @return array 
+		 * Set spine
+		 *
+		 * @return array
 		 */
 		public function setSpine(array $spine)
 		{
@@ -252,14 +252,14 @@ namespace Epub
 			}
 			$this->spine = $newSpine;
 		}
-		
+
 		/**
 		 * Add chapter
-		 * 
+		 *
 		 * @param string $title  The title of the chapter
 		 * @param string $file   The content file of the chapter
-		 * @param string $parent The identifier of the parent navPoint 
-		 * 
+		 * @param string $parent The identifier of the parent navPoint
+		 *
 		 * @return void
 		 */
 		public function addChapter($title, $file, $parent = null)
@@ -270,13 +270,13 @@ namespace Epub
 			if (false === \is_readable($file)) {
 				throw new Exception('File ' . $file . ' is not readable.');
 			}
-					
+
 			$mimetype = self::getMimetype($file);
 			if ($mimetype !== 'application/xhtml+xml' && $mimetype !== 'application/xml') {
-				throw new Exception('Unsupported mymetype of the content file "' . 
+				throw new Exception('Unsupported mymetype of the content file "' .
 					$file . '": ' . var_export($mimetype, 1));
 			}
-			
+
 			$ds = \DIRECTORY_SEPARATOR;
 			$content = XML::loadFile($file, __DIR__ . $ds . 'Schema' . $ds . 'content-xhtml.rng');
 			$content->registerXPathNamespace('ns', 'http://www.w3.org/1999/xhtml');
@@ -297,7 +297,7 @@ namespace Epub
 				}
 				$_file = $filePath . $src;
 				if (false === \is_file($_file)) {
-					throw new Exception('File "' . $_file . '" referenced within "' . 
+					throw new Exception('File "' . $_file . '" referenced within "' .
 						$file . '" does not exist.');
 				}
 				if ('.css' === \strtolower(\substr($_file, -4))) {
@@ -309,7 +309,7 @@ namespace Epub
 							}
 							$path = \dirname($_file) . $ds . $val;
 							if (false === \is_file($path)) {
-								throw new Exception('File "' . $path . '" referenced within "' . 
+								throw new Exception('File "' . $path . '" referenced within "' .
 									$_file . '" does not exist.');
 							}
 							$files[] = $path;
@@ -319,7 +319,7 @@ namespace Epub
 				$files[] = $_file;
 			}
 			$files[] = $file;
-			
+
 			// add files to the manifest
 			$files = \array_keys(\array_flip($files));
 			foreach ($files as $key => $_file) {
@@ -347,9 +347,9 @@ namespace Epub
 							$id = $newid;
 						}
 					}
-					
+
 					if (true === isset($this->href2id[$href])) {
-						throw new Exception('File "' . $href . 
+						throw new Exception('File "' . $href .
 							'" is already exists within manifest under id ' . $id);
 					}
 	                $this->manifest[$id] = array(
@@ -361,7 +361,7 @@ namespace Epub
 	                $this->href2id[$href] = $id;
 				}
 			}
-			
+
          	// add to navMap and spine
          	$prevHref = $this->ncx->addNavPoint($id, $title, $href, $parent);
          	if (false !== $prevHref) {
@@ -383,24 +383,24 @@ namespace Epub
 	         	);
          	}
 		}
-		
+
 		/**
 		 * Read existing package XML file
-		 * 
+		 *
 		 * @param string $xmlFile XML file
 		 * @param string $strict  Do not tolerate epub errors
-		 * 
+		 *
 		 * @return void
 		 */
 		protected function readXML($xmlFile, $strict = true)
 		{
 			// shortcut
 			$ds = \DIRECTORY_SEPARATOR;
-			
+
 			$package       = XML::loadFile($xmlFile, __DIR__ . $ds . 'Schema' . $ds . 'opf.rng');
 			$this->uid     = XML::getAttr($package, 'unique-identifier');
 			$this->version = XML::getAttr($package, 'version');
-			
+
 			// parse metadata
 			$ns = $package->getDocNamespaces(true);
 			foreach ($ns as $prefix => $uri) {
@@ -415,7 +415,7 @@ namespace Epub
 						$attrs = array();
                         $this->metadata[$key] = array(
                         	'value' => (string)$value,
-                        	'attrs' => array() 
+                        	'attrs' => array()
                         );
                         if (false === empty($prefix)) {
 	                        foreach ($ns as $_prefix => $_uri) {
@@ -428,25 +428,25 @@ namespace Epub
                     }
 				}
 			}
-			
+
 			// parse manifest
 			foreach ($package->manifest->item as $item) {
-				
+
 				// get node attributes
 				$id   = XML::getAttr($item, 'id');
 				$href = XML::getAttr($item, 'href');
 				$type = XML::getAttr($item, 'media-type');
 				$file = \dirname($xmlFile) . $ds . $href;
-				
+
 				// check foe existance of the file
 				if (false === \is_file($file)) {
-					throw new Exception('File "' . $file . '" referenced in manifest under id ' . 
+					throw new Exception('File "' . $file . '" referenced in manifest under id ' .
 						$id . ' does not exist.');
 				}
-				
+
 				// validate content of the file
 				switch ($type) {
-					
+
 					case 'application/xhtml+xml':
 						$content = XML::loadFile($file, __DIR__ . $ds . 'Schema' . $ds . 'content-xhtml.rng');
 						$content->registerXPathNamespace('ns', 'http://www.w3.org/1999/xhtml');
@@ -465,11 +465,13 @@ namespace Epub
 							}
 							$_file = \dirname($file) . $ds . $src;
 							if (false === \is_file($_file)) {
-								throw new Exception('File "' . $_file . '" referenced within "' . 
+								throw new Exception('File "' . $_file . '" referenced within "' .
 									$file . '" does not exist.');
 							}
 							if ('.css' === \strtolower(\substr($_file, -4))) {
 								$css = \file_get_contents($_file);
+								// remove comments
+								$css = preg_replace('!/\*[^*]*\*+([^/][^*]*\*+)*/!', '', $css);
 								if (0 < \preg_match_all('#url\s*\(([^\)]+)\)#smi', $css, $m)) {
 									foreach ($m[1] as $val) {
 										if ("'" === ($c = $val[0]) || '"' === ($c = $val[0])) {
@@ -477,7 +479,7 @@ namespace Epub
 										}
 										$path = \dirname($_file) . '/' . $val;
 										if (false === \is_file($path)) {
-											throw new Exception('File "' . $path . '" referenced within "' . 
+											throw new Exception('File "' . $path . '" referenced within "' .
 												$_file . '" does not exist.');
 										}
 										$this->addRefCount($path, $_file);
@@ -488,10 +490,10 @@ namespace Epub
 						}
 						break;
 				}
-				
+
 				// increase refcounter
 				$this->addRefCount($file);
-				
+
 				// add to manifest
                 $this->manifest[$id] = array(
                     'id'         => $id,
@@ -499,15 +501,15 @@ namespace Epub
                     'media-type' => $type,
                 	'file'   	 => $file
                 );
-                
+
                 $this->href2id[$href] = $id;
-                
+
                 // instantiate NCX
                 if ($id === 'ncx') {
                 	$this->ncx = new NCX($file, $strict);
                 }
             }
-            
+
             // parse spine
             foreach ($package->spine->itemref as $itemref) {
          		$idref  = XML::getAttr($itemref, 'idref');
@@ -523,7 +525,7 @@ namespace Epub
                     );
                 }
             }
-            
+
             // parse guide
 		 	if ($package->guide->reference instanceof \SimpleXMLElement) {
 		 		foreach ($package->guide->reference as $reference) {
@@ -535,31 +537,31 @@ namespace Epub
 		 		}
             }
 		}
-		
+
 		/**
 		 * Returns XML representation of the package
-		 * 
-		 * @param string $xmlFile File name of XML file. 
-		 * 
+		 *
+		 * @param string $xmlFile File name of XML file.
+		 *
 		 * @return void
 		 */
 		public function asXML($xmlFile)
 		{
 			// shortcut
 			$ds = \DIRECTORY_SEPARATOR;
-			
+
 			$xmlPath = \dirname($xmlFile) . $ds;
 			if (false === \is_dir($xmlPath) && false === @ \mkdir($xmlPath)) {
 				throw new Exception('Cannot create directory "' . $xmlPath . '" due to unknown reason.');
 			}
-			
-			$xmlStr = '<?xml version="1.0" encoding="UTF-8"?>' . PHP_EOL . 
-					  '<package version="' . $this->version . '" xmlns="http://www.idpf.org/2007/opf" ' . 
-					  'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' . 
+
+			$xmlStr = '<?xml version="1.0" encoding="UTF-8"?>' . PHP_EOL .
+					  '<package version="' . $this->version . '" xmlns="http://www.idpf.org/2007/opf" ' .
+					  'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' .
 				      'unique-identifier="' . $this->uid . '">';
-			
+
 			// metadata
-			$xmlStr .= '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/" ' . 
+			$xmlStr .= '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/" ' .
                 	   'xmlns:opf="http://www.idpf.org/2007/opf">';
 			foreach ($this->metadata as $key => $item) {
 				if ($key === 'meta') {
@@ -577,7 +579,7 @@ namespace Epub
 				}
 			}
 			$xmlStr .= '</metadata>';
-			
+
 			// manifest
 			if (empty($this->manifest)) {
 				throw new Exception('The manifest element must contain one or more item elements.');
@@ -589,7 +591,7 @@ namespace Epub
 					|| false === isset($item['href'])
 					|| false === isset($item['media-type'])
 				) {
-					throw new Exception('Each item element contained within a manifest element must ' . 
+					throw new Exception('Each item element contained within a manifest element must ' .
 						'have the attributes id, href and media-type');
 				}
 				if (false === isset($item['file']) || false === \is_file($item['file'])) {
@@ -612,16 +614,16 @@ namespace Epub
 				$xmlStr    .= ' media-type="' . $item['media-type'] . '" />';
 				$targetPath = \dirname($xmlPath . $item['href']);
 				if (false === \is_dir($targetPath) && false === @ \mkdir($targetPath)) {
-					throw new Exception('Cannot create directory "' . $targetPath . 
+					throw new Exception('Cannot create directory "' . $targetPath .
 						'" due to unknown reason.');
 				}
 				if (false === @ \copy($item['file'], $xmlPath . $item['href'])) {
-					throw new Exception('Cannot copy file "' . $item['file'] . 
+					throw new Exception('Cannot copy file "' . $item['file'] .
 						'" to "' . $xmlPath . $item['href'] . '" due to unknown reason.');
 				}
 			}
 			$xmlStr .= '</manifest>';
-			
+
 			// spine
 			if (true === empty($this->spine)) {
 				throw new Exception('The spine element must contain one or more itemref elements.');
@@ -642,17 +644,17 @@ namespace Epub
 				$xmlStr .= ' />';
 			}
 			$xmlStr .= '</spine>';
-			
+
 			// guide
 			if (false === empty($this->guide)) {
 				$xmlStr .= '<guide>';
 				foreach ($this->guide as $item) {
 					if (false === isset($hrefs2ids[$item['href']])) {
-						throw new Exception('Guide element is not referenced in the manifest: ' . 
+						throw new Exception('Guide element is not referenced in the manifest: ' .
 							$item['href']);
 					}
-					$xmlStr .= '<reference type="' . $item['type'] . 
-							   '" title="' . $item['title'] . 
+					$xmlStr .= '<reference type="' . $item['type'] .
+							   '" title="' . $item['title'] .
 							   '" href="' . $item['href'] . '" />';
 				}
 				$xmlStr .= '</guide>';
@@ -660,22 +662,22 @@ namespace Epub
 			$xmlStr .= '</package>';
 
 			XML::loadString($xmlStr, __DIR__ . $ds . 'Schema' . $ds . 'opf.rng')->asXML($xmlFile);
-			
+
 			if ($this->ncx) {
-				if (false === isset($this->manifest['ncx']) 
+				if (false === isset($this->manifest['ncx'])
 					|| true === empty($this->manifest['ncx']['href'])) {
 					throw new Exception('Cannot determine filename of the NCX');
 				}
 				$this->ncx->asXML(\dirname($xmlFile) . $ds . $this->manifest['ncx']['href']);
 			}
 		}
-		
+
 		/**
 		 * Increase refcount for given file
-		 * 
+		 *
 		 * @param string $file   Path to the file
 		 * @param string $usedBy Path to the file where first file is used by
-		 * 
+		 *
 		 * @return void
 		 */
 		protected function addRefCount($file, $usedBy = null)
@@ -694,10 +696,10 @@ namespace Epub
 
 		/**
 		 * Decrease refcount for given file
-		 * 
+		 *
 		 * @param string $file Path to the file
 		 * @param string $usedBy Path to the file where first file is used by
-		 * 
+		 *
 		 * @return void
 		 */
 		protected function delRefCount($file, $usedBy = null)
@@ -724,12 +726,12 @@ namespace Epub
 				}
 			}
 		}
-		
+
 		/**
 		 * Get mimetype of the give file
-		 * 
+		 *
 		 * @param string $file
-		 * 
+		 *
 		 * @return string
 		 */
 		public static function getMimetype($file)
@@ -750,5 +752,5 @@ namespace Epub
 					break;
 			}
 		}
-	}	
+	}
 }

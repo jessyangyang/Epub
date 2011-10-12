@@ -45,9 +45,9 @@ namespace Epub
 {
 	use DOMDocument;
 	use Exception;
-	
+
 	\libxml_use_internal_errors(true);
-	
+
     /**
      * XML helper class
      *
@@ -77,31 +77,31 @@ namespace Epub
                 }
             }
         }
-        
+
         /**
          * Read XML string and return \SimpleXMLElement
-         * 
+         *
          * @param string $xmlString XML content
          * @param string $schema    Path to the schema file to validate
-         * 
+         *
          * @return \SimpleXMLElement
          */
         public static function loadString($xmlString, $schema = null)
         {
         	if (false !== strpos($xmlString, 'http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd')) {
         		$xmlString = str_replace(
-        			'http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd', 
+        			'http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd',
         			__DIR__ . '/Schema/dtd/xhtml/xhtml11.dtd',
         			$xmlString
         		);
         	}
-        	
+
         	$xdoc = new DOMDocument();
-       		if (false === $xdoc->loadXML($xmlString, \LIBXML_NSCLEAN | \LIBXML_NOCDATA | \LIBXML_DTDLOAD) 
+       		if (false === $xdoc->loadXML($xmlString, \LIBXML_NSCLEAN | \LIBXML_NOCDATA | \LIBXML_DTDLOAD)
 				|| false !== libxml_get_last_error()) {
 				self::raiseError();
 			}
-			
+
         	if ($schema !== null) {
 				if (false === is_file($schema)) {
 					throw new Exception('Schema file "' . $schema . '" does not exist');
@@ -110,7 +110,7 @@ namespace Epub
 					throw new Exception('Schema file "' . $schema . '" does not readable');
 				}
 			}
-			
+
 			if ($schema !== null) {
 				switch  (strtolower(substr($schema, -4, 4))) {
 					case '.xsd':
@@ -127,16 +127,16 @@ namespace Epub
 					self::raiseError();
 				}
 			}
-			
+
         	return \simplexml_import_dom($xdoc);
-        } 
-        
+        }
+
         /**
          * Read XML file and return \SimpleXMLElement
-         * 
+         *
          * @param string $xmlFile Path to the XML file
          * @param string $schema  Path to the schema file to validate
-         * 
+         *
          * @return \SimpleXMLElement
          */
         public static function loadFile($xmlFile, $schema = null)
@@ -144,11 +144,11 @@ namespace Epub
 			if (false === is_file($xmlFile)) {
 				throw new Exception('XML file "' . $xmlFile . '" does not exist');
 			}
-				
+
 			if (false === is_readable($xmlFile)) {
 				throw new Exception('XML file "' . $xmlFile . '" does not readable');
 			}
-			
+
 			if ($schema !== null) {
 				if (false === is_file($schema)) {
 					throw new Exception('Schema file "' . $schema . '" does not exist');
@@ -157,38 +157,17 @@ namespace Epub
 					throw new Exception('Schema file "' . $schema . '" does not readable');
 				}
 			}
-			
-			return self::loadString(file_get_contents($xmlFile), $schema);
-			
-			$xdoc = new DOMDocument();
-			if (false === $xdoc->load($xmlFile, \LIBXML_NSCLEAN | \LIBXML_NOCDATA | \LIBXML_DTDLOAD) 
-				|| false !== libxml_get_last_error()) {
-				self::raiseError();
+
+			try {
+				return self::loadString(file_get_contents($xmlFile), $schema);
+			} catch (\Exception $e) {
+				throw new Exception('File "' . $xmlFile . '": ' . PHP_EOL . $e->getMessage());
 			}
-			
-			if ($schema !== null) {
-				switch  (strtolower(substr($schema, -4, 4))) {
-					case '.xsd':
-						$valid = $xdoc->schemaValidate($schema);
-						break;
-					case '.dtd':
-						$valid = $xdoc->validate($schema);
-						break;
-					case '.rng':
-						$valid = $xdoc->relaxNGValidate($schema);
-						break;
-				}
-				if (false === $valid) {
-					self::raiseError();
-				}
-			}
-			
-        	return \simplexml_import_dom($xdoc);
-        } 
-        
+        }
+
         /**
          * Raise XML error
-         * 
+         *
          * @return void
          * @throws Exception
          */

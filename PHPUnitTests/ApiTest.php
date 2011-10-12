@@ -68,6 +68,18 @@ namespace Epub\PHPUnitTests
         protected static $tmpDir;
 
         /**
+         * Container for instance of the new Epub file
+         * @var \Epub\Epub
+         */
+        protected static $nEpub;
+
+        /**
+         * Container for instance of the opened Epub file
+         * @var \Epub\Epub
+         */
+        protected static $oEpub;
+
+        /**
          * Set up stuff for the tests.
          *
          * @return void
@@ -119,8 +131,8 @@ namespace Epub\PHPUnitTests
          */
         public function testConstructor()
         {
-            $epub = new Epub(self::$tmpDir . 'new.epub');
-            $this->assertInstanceOf('\\Epub\\Epub', $epub);
+            self::$nEpub = new Epub(self::$tmpDir . 'new.epub');
+            $this->assertInstanceOf('\\Epub\\Epub', self::$nEpub);
         }
 
         /**
@@ -130,21 +142,172 @@ namespace Epub\PHPUnitTests
          */
         public function testOpenEpub()
         {
-            $epubFile = __DIR__ . \DIRECTORY_SEPARATOR . 'taz_2010_05_22.epub';
+            $epubFile = __DIR__ . \DIRECTORY_SEPARATOR . 'Seelengold.epub';
             if (false === \is_file($epubFile)) {
                 $this->markTestSkipped('Epub file ' . $epubFile . ' is missing');
                 return;
             }
-            $epub = new Epub($epubFile);
-            $this->assertInstanceOf('\\Epub\\Epub', $epub);
-            $this->assertSame($epub->getTitle(), 'taz vom 22.05.2010');
-            $this->assertSame($epub->getLanguage(), 'de-DE');
-            $this->assertSame($epub->getIdentifier(), 'taz_2010-05-22_v_1');
-            $this->assertSame($epub->getCreator(), 'taz Entwicklungs GmbH & Co. Medien KG');
-            $this->assertSame($epub->getPublisher(), 'taz, die tageszeitung');
-            $this->assertSame($epub->getDate(), '2010-05-22');
-            $this->assertSame($epub->getDescription(), 'taz vom 22.05.2010');
+            self::$oEpub = new Epub($epubFile);
+            $this->assertInstanceOf('\\Epub\\Epub', self::$oEpub);
+            $this->assertSame(self::$oEpub->getTitle(), 'SEELENGOLD - Die Chroniken der Akkadier #1');
+            $this->assertSame(self::$oEpub->getLanguage(), 'de');
+            $this->assertSame(self::$oEpub->getIdentifier(), 'SEELENGOLD  Die Chroniken der Akkadier #1 [2011-05-29 15:00:05]');
+            $this->assertSame(self::$oEpub->getCreator(), 'Jordan Bay');
+            $this->assertSame(self::$oEpub->getPublisher(), 'Hrsg.: chichili agency-satzweiss.com');
+            $this->assertSame(self::$oEpub->getDate(), '2011-05-29');
+            $this->assertSame(self::$oEpub->getRights(), NULL);
+            $this->assertSame(self::$oEpub->getDescription(), NULL);
         }
 
+        /**
+         * Test setting of the title
+         *
+         * @return void
+         */
+        public function testSetTitle()
+        {
+            if (false === (self::$oEpub instanceof Epub)) {
+                $this->markTestSkipped('No opened epub file exists.');
+                return;
+            }
+            $this->assertSame(self::$oEpub->getTitle(), 'SEELENGOLD - Die Chroniken der Akkadier #1');
+            $newTitle = 'Foo Bar';
+            self::$oEpub->setTitle($newTitle);
+            $this->assertSame(self::$oEpub->getTitle(), $newTitle);
+        }
+
+        /**
+         * Test setting of the creator
+         *
+         * @return void
+         */
+        public function testSetCreator()
+        {
+            if (false === (self::$oEpub instanceof Epub)) {
+                $this->markTestSkipped('No opened epub file exists.');
+                return;
+            }
+            $this->assertSame(self::$oEpub->getCreator(), 'Jordan Bay');
+            $newCreator = 'Foo Bar Ltd.';
+            self::$oEpub->setCreator($newCreator);
+            $this->assertSame(self::$oEpub->getCreator(), $newCreator);
+        }
+
+        /**
+         * Test setting of the language
+         *
+         * @return void
+         */
+        public function testSetLanguage()
+        {
+            if (false === (self::$oEpub instanceof Epub)) {
+                $this->markTestSkipped('No opened epub file exists.');
+                return;
+            }
+            $this->assertSame(self::$oEpub->getLanguage(), 'de');
+            $newLang = 'en-GB';
+            self::$oEpub->setLanguage($newLang);
+            $this->assertSame(self::$oEpub->getLanguage(), $newLang);
+        }
+
+        /**
+         * Test setting of the identifier
+         *
+         * @return void
+         */
+        public function testSetIdentifier()
+        {
+            if (false === (self::$oEpub instanceof Epub)) {
+                $this->markTestSkipped('No opened epub file exists.');
+                return;
+            }
+            $this->assertSame(self::$oEpub->getIdentifier(),
+                'SEELENGOLD  Die Chroniken der Akkadier #1 [2011-05-29 15:00:05]');
+            $newIdentifier = md5('Foo Bar');
+            self::$oEpub->setIdentifier($newIdentifier);
+            $this->assertSame(self::$oEpub->getIdentifier(), $newIdentifier);
+        }
+
+        /**
+         * Test setting of the publisher
+         *
+         * @return void
+         */
+        public function testSetPublisher()
+        {
+            if (false === (self::$oEpub instanceof Epub)) {
+                $this->markTestSkipped('No opened epub file exists.');
+                return;
+            }
+            $this->assertSame(self::$oEpub->getPublisher(), 'Hrsg.: chichili agency-satzweiss.com');
+            $newPublisher = md5('Foo Bar Publisher');
+            self::$oEpub->setPublisher($newPublisher);
+            $this->assertSame(self::$oEpub->getPublisher(), $newPublisher);
+        }
+
+        /**
+         * Test setting of the date
+         *
+         * @return void
+         */
+        public function testSetDate()
+        {
+            if (false === (self::$oEpub instanceof Epub)) {
+                $this->markTestSkipped('No opened epub file exists.');
+                return;
+            }
+            $this->assertSame(self::$oEpub->getDate(), '2011-05-29');
+            $newDate = date('Y-m-d');
+            self::$oEpub->setDate($newDate);
+            $this->assertSame(self::$oEpub->getDate(), $newDate);
+        }
+
+        /**
+         * Test setting of the rights
+         *
+         * @return void
+         */
+        public function testSetRights()
+        {
+            if (false === (self::$oEpub instanceof Epub)) {
+                $this->markTestSkipped('No opened epub file exists.');
+                return;
+            }
+            $this->assertSame(self::$oEpub->getRights(), NULL);
+            $newRights = 'Foo Bar Ltd.';
+            self::$oEpub->setRights($newRights);
+            $this->assertSame(self::$oEpub->getRights(), $newRights);
+        }
+
+        /**
+         * Test setting of the description
+         *
+         * @return void
+         */
+        public function testSetDescription()
+        {
+            if (false === (self::$oEpub instanceof Epub)) {
+                $this->markTestSkipped('No opened epub file exists.');
+                return;
+            }
+            $this->assertSame(self::$oEpub->getDescription(), NULL);
+            $newDescr = 'Foo Bar ePub';
+            self::$oEpub->setDescription($newDescr);
+            $this->assertSame(self::$oEpub->getDescription(), $newDescr);
+        }
+
+        /**
+         * Test getting of the spine
+         *
+         * @return void
+         */
+        public function testGetSpine()
+        {
+            if (false === (self::$oEpub instanceof Epub)) {
+                $this->markTestSkipped('No opened epub file exists.');
+                return;
+            }
+            $spine = self::$oEpub->getSpine();
+        }
     }
 }
