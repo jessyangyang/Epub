@@ -219,6 +219,36 @@ namespace Epub
         }
 
         /**
+         * Get XML representation of the SimpleXMLElement object
+         *
+         * @param SimpleXMLElement $sxe      SimpleXMLElement object
+         * @param array            $options  Tidy options
+         * @param string           $encoding Encoding, default utf8
+         *
+         * @return string
+         */
+        public static function toXML(\SimpleXMLElement $sxe, array $options = array(), $encoding = 'utf8')
+        {
+            if (false === \extension_loaded('tidy')) {
+                return $sxe->asXML();
+            }
+
+            static $tidy, $opts;
+            if (null === $tidy) {
+                $tidy = new \Tidy();
+                $opts = array(
+                    'indent'     => true,
+                    'output-xml' => true,
+                    'wrap'       => 110
+                );
+            }
+            $opts = !empty($options) ? array_merge($opts, $options) : $opts;
+            $tidy->parseString($sxe->asXML(), $opts, $encoding);
+            $tidy->cleanRepair();
+            return $tidy->html()->value;
+        }
+
+        /**
          * Raise XML error
          *
          * @return void
