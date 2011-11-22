@@ -264,6 +264,7 @@ namespace Epub
                 }
                 $errorMessage .= PHP_EOL;
             }
+            \libxml_clear_errors();
             throw new Exception($errorMessage);
         }
     }
