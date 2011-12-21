@@ -44,20 +44,20 @@
 namespace Epub
 {
 	require_once __DIR__ . \DIRECTORY_SEPARATOR . 'XML.php';
-	
+
 	use Exception;
-	
+
 	/**
 	 * Navigation Center eXtended (NCX) class
 	 */
 	class NCX
 	{
 		/**
-		 * ´Meta information 
+		 * ´Meta information
 		 * @var array
 		 */
 		protected $meta = array();
-		
+
 		/**
 		 * Title information
 		 * @var array
@@ -66,52 +66,52 @@ namespace Epub
 			'text' => 'Untitled',
 			'img'  => ''
 		);
-		
+
 		/**
 		 * Author information
 		 * @var array
 		 */
 		protected $docAuthor = array();
-		
+
 		/**
 		 * Page list
 		 * @var array
 		 */
 		protected $pageList = array();
-		
+
 		/**
 		 * Navigation list
 		 * @var array
 		 */
 		protected $navList = array();
-		
+
 		/**
 		 * Mapping table (navPoint id to scr)
 		 * @var array
 		 */
 		protected $navId2src = array();
-		
+
 		/**
 		 * Mapping table (navPoint id to navPoint)
 		 * @var array
 		 */
 		protected $navId2navPoint = array();
-		
+
 		/**
 		 * Mapping table (navPoint id to parent navPoint id)
 		 * @var array
 		 */
 		protected $parents = array();
-		
+
 		/**
 		 * Mapping table (child ids of the navPoint)
 		 * @var array
 		 */
 		protected $childs = array();
-		
+
 		/**
 		 * Constructor
-		 * 
+		 *
 		 * @param string $xmlFile XML file
 		 * @param string $strict  Do not tolerate epub errors
 		 */
@@ -123,24 +123,24 @@ namespace Epub
 				// what?
 			}
 		}
-		
+
 		/**
 		 * Get protected properties
-		 * 
+		 *
 		 * @param string $name Property name
-		 * 
+		 *
 		 * @return mixed value
 		 */
 		public function __get($name)
 		{
 			return true === isset($this->{$name}) ? $this->{$name} : null;
 		}
-		
+
 		/**
 		 * Get navPoint by id
-		 * 
+		 *
 		 * @param string $id NavPoint id
-		 * 
+		 *
 		 * @return array
 		 */
 		public function getNavPoint($id)
@@ -158,15 +158,15 @@ namespace Epub
 			}
 			return $retval;
 		}
-		
+
 		/**
 		 * Add nav point
-		 * 
+		 *
 		 * @param string $id       Identifier of the navigation  point
 		 * @param string $label    Label of the navigation  point
 		 * @param string $href     Path to the file
 		 * @param string $parentId Identifier of the parent navigation point
-		 * 
+		 *
 		 * @return href of the previous navigation point
 		 */
 		public function addNavPoint($id, $label, $href, $parentId = null)
@@ -207,20 +207,20 @@ namespace Epub
 			$this->navId2navPoint[$item['id']] = $item;
 			return $retval;
 		}
-		
+
 		/**
 		 * Read existing package XML file
-		 * 
+		 *
 		 * @param string $xmlFile XML file
 		 * @param string $strict  Do not tolerate epub errors
-		 * 
+		 *
 		 * @return void
 		 */
 		protected function readXML($xmlFile, $strict = true)
 		{
 			// shortcut
 			$ds = \DIRECTORY_SEPARATOR;
-			
+
 			$ncx = XML::loadFile($xmlFile, __DIR__ . $ds . 'Schema' . $ds . 'ncx.rng');
 
 			if (true === isset($ncx->head->meta)) {
@@ -233,7 +233,7 @@ namespace Epub
 			if (true === isset($ncx->docTitle->img)) {
 				$this->docTitle['img']['src'] = (string)XML::getAttr($ncx->docTitle->img, 'src');
 			}
-			
+
 			if (true === isset($ncx->docAuthor)) {
 				$this->docAuthor['text'] = (string) $ncx->docAuthor->text;
 				if (true === isset($ncx->docAuthor->img)) {
@@ -258,7 +258,7 @@ namespace Epub
 					);
 				}
 			}
-			
+
 			if (true === isset($ncx->navList)) {
 				foreach ($ncx->navList->navTarget as $navTarget) {
 					$this->navList[] = array(
@@ -272,27 +272,27 @@ namespace Epub
 				}
 			}
 		}
-		
+
 	    /**
 		 * Returns XML representation of the package
-		 * 
-		 * @param string $xmlFile File name of XML file. 
-		 * 
+		 *
+		 * @param string $xmlFile File name of XML file.
+		 *
 		 * @return void
 		 */
 		public function asXML($xmlFile)
 		{
 			// shortcut
 			$ds = \DIRECTORY_SEPARATOR;
-			
+
 			$xmlPath = \dirname($xmlFile) . $ds;
 			if (false === \is_dir($xmlPath) && false === @ \mkdir($xmlPath)) {
 				throw new Exception('Cannot create directory "' . $xmlPath . '" due to unknown reason.');
 			}
-			
-			$xmlStr = '<?xml version="1.0" encoding="UTF-8"?>' . PHP_EOL . 
+
+			$xmlStr = '<?xml version="1.0" encoding="UTF-8"?>' . PHP_EOL .
 					  '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1" xml:lang="en-US">';
-			
+
 			if (false === empty($this->meta)) {
 				$xmlStr .= '<head>';
 				foreach ($this->meta as $name => $content) {
@@ -300,13 +300,13 @@ namespace Epub
 				}
 				$xmlStr .= '</head>';
 			}
-			
+
 			$xmlStr .= '<docTitle><text>' . $this->docTitle['text'] . '</text>';
 			if (false === empty($this->docTitle['img'])) {
 				$xmlStr .= '<img src="' . $this->docTitle['img'] . '" />';
 			}
 			$xmlStr .= '</docTitle>';
-			
+
 			if (false === empty($this->docAuthor) && false === empty($this->docAuthor['text'])) {
 				$xmlStr .= '<docAuthor><text>' . $this->docAuthor['text'] . '</text>';
 				if (false === empty($this->docAuthor['img'])) {
@@ -314,7 +314,7 @@ namespace Epub
 				}
 				$xmlStr .= '</docAuthor>';
 			}
-			
+
 			$xmlStr .= '<navMap>';
 			foreach ($this->navId2src as $navPointId => $src) {
 				if (false === isset($this->navId2navPoint[$navPointId])) {
@@ -323,7 +323,7 @@ namespace Epub
 				$xmlStr .= $this->navPoint2Xml($this->navId2navPoint[$navPointId]);
 			}
 			$xmlStr .= '</navMap>';
-			
+
 			if (false === empty($this->pageList)) {
 				$xmlStr .= '<pageList>';
 				foreach ($this->pageList as $pageTarget) {
@@ -339,7 +339,7 @@ namespace Epub
 					if (false === isset($pageTarget['content'])) {
 						throw new Exception('Missing required element "content" within pageTarget');
 					}
-					$xmlStr .= '<pageTarget type="' . $pageTarget['id'] . 
+					$xmlStr .= '<pageTarget type="' . $pageTarget['id'] .
 						'" playOrder="' . $pageTarget['playOrder'] . '"';
 					if (true === isset($pageTarget['id'])) {
 						$xmlStr .= ' id="' . $pageTarget['id'] . '"';
@@ -356,7 +356,7 @@ namespace Epub
 				}
 				$xmlStr .= '</pageList>';
 			}
-			
+
 			if (false === empty($this->navList)) {
 				$xmlStr .= '<navList>';
 				foreach ($this->navList as $navTarget) {
@@ -372,7 +372,7 @@ namespace Epub
 					if (false === isset($pageTarget['content'])) {
 						throw new Exception('Missing required element "content" within navTarget');
 					}
-					$xmlStr .= '<navTarget id="' . $pageTarget['id'] . 
+					$xmlStr .= '<navTarget id="' . $pageTarget['id'] .
 						'" playOrder="' . $pageTarget['playOrder'] . '"';
 					if (true === isset($pageTarget['value'])) {
 						$xmlStr .= ' value="' . $pageTarget['value'] . '"';
@@ -390,12 +390,12 @@ namespace Epub
 
 			XML::loadString($xmlStr, __DIR__ . $ds . 'Schema' . $ds . 'ncx.rng')->asXML($xmlFile);
 		}
-		
+
 		/**
 		 * Parse single navPoint and its children
-		 * 
+		 *
 		 * @param array|\SimpleXMLElemen $navPoint
-		 * 
+		 *
 		 * @return void
 		 */
 		protected function parseNavPoints(\SimpleXMLElement $navPoint, $parentId = null)
@@ -423,12 +423,12 @@ namespace Epub
 			$this->navId2navPoint[$item['id']] = $item;
 			return $item;
 		}
-		
+
 		/**
 		 * Returns XML representation of the navPoint array
-		 * 
+		 *
 		 * @param array $navPoint Navigation point arraya
-		 * 
+		 *
 		 * @return string XML
 		 */
 		protected function navPoint2Xml(array $navPoint)
