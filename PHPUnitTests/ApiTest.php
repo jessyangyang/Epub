@@ -326,7 +326,6 @@ namespace Epub\PHPUnitTests
             }
             $chapters = self::$oEpub->getChapters();
             $this->assertSame(count($chapters), 148);
-print_r($chapters);
         }
     }
 }
