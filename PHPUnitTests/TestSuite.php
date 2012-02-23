@@ -44,6 +44,8 @@
 namespace Epub\PHPUnitTests
 {
     \spl_autoload_register('\\Epub\\PHPUnitTests\\autoload');
+    
+    use \Exception;
 
     /**
      * Autoload function for PHPUnit components
@@ -61,11 +63,14 @@ namespace Epub\PHPUnitTests
                 $incs[\str_replace('-', '/', \basename($v))] = $v;
             }
         }
-        if (\strpos($className, 'PHPUnit') === 0) {
-            $filePath = $incs['phpunit'] . '/'. \str_replace('_', \DIRECTORY_SEPARATOR, $className);
-            $fileName = $filePath . '.php';
-            if (\is_file($fileName)) {
-                include $fileName;
+        if (strpos($className, 'PHPUnit') === 0 || strpos($className, 'PHP') === 0) {
+            foreach ($incs as $incPath) {
+                $filePath = $incPath . '/'. str_replace('_', DIRECTORY_SEPARATOR, $className);
+                $fileName = $filePath . '.php';
+                if (is_file($fileName)) {
+                    include $fileName;
+                    break;
+                }
             }
         } else if (\strpos($className, 'Epub\\') === 0) {
 
@@ -73,9 +78,11 @@ namespace Epub\PHPUnitTests
             $fileName = $filePath . '.php';
             if (\is_file($fileName)) {
                 include $fileName;
+            } else {
+                throw new Exception('Unable to autoload class ' . $className);
             }
         } else {
-            echo 'Not a PHPUnit: $className=' . $className . \PHP_EOL;
+            throw new Exception('Unable to autoload class ' . $className);
         }
     }
 
