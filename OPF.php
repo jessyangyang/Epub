@@ -170,25 +170,35 @@ namespace Epub
          * Get metadata
          *
          * @param string $meta   Meta name
-         * @param string $prefix Namespace
+         * @param string $prefix Namespace, default ``dc``
          *
+         * @return array dc metadata or string meta value
          */
         public function getMetadata($meta, $prefix = 'dc')
         {
             $key = $prefix . ':' . $meta;
-            return isset($this->metadata[$key]) ? $this->metadata[$key] : false;
+            $ret = isset($this->metadata[$key]) ? $this->metadata[$key] : false;
+            if ($ret === false && isset($this->metadata['meta'][$meta])) {
+                $ret = $this->metadata['meta'][$meta];
+            }
+            return $ret;
         }
 
         /**
          * Set metadata
          *
-         * @param string $meta  Meta name
-         * @param string $value Value
-         * @param string $role  Role
+         * @param string $meta   Meta name
+         * @param string $value  Value
+         * @param string $prefix Namespace
+         * @param array  $attrs  Attributes
          *
          */
-        public function setMetadata($meta, $value , array $attrs = array(), $prefix = 'dc')
+        public function setMetadata($meta, $value , $prefix = null, array $attrs = array())
         {
+            if ($prefix === null) {
+                $this->metadata['meta'][$meta] = $value;
+                return;
+            }
             $key = $prefix . ':' . $meta;
             $this->metadata[$key] = array(
                 'value' => $value,
@@ -238,7 +248,9 @@ namespace Epub
         /**
          * Set spine
          *
-         * @return array
+         * @param array $spine Spine to set
+         *
+         * @return void
          */
         public function setSpine(array $spine)
         {
@@ -257,6 +269,75 @@ namespace Epub
             }
             $this->spine = $newSpine;
         }
+        
+        /**
+         * Get guide
+         *
+         * @return array
+         */
+        public function getGuide()
+        {
+            return $this->guide;
+        }
+        
+        /**
+         * Set guide
+         *
+         * @param array $guide Guide to set
+         *
+         * @return void
+         */
+        public function setGuide(array $guide)
+        {
+            $newGuide = array();
+            foreach ($guide as $ref) {
+                $href = false !== ($pos = strpos('#', $ref['href'])) ? 
+                    substr($ref['href'], 0, $pos) : $ref['href'];
+                $item = $this->getManifestByHref($href);
+                if (null !== $item) {
+                    $newGuide[] = $ref;
+                } else {
+                    throw new Exception(
+                        'Guide error: cannot find appropriate manifest item with href ' . $href
+                    );
+                }
+            }
+            $this->guide = $newGuide;
+        }
+        
+        /**
+         * Set cover of the book
+         *
+         * @param string $cover Cover html file
+         * @param string $title Guide title
+         *
+         * @return void
+         */
+        public function setCover($cover, $title)
+        {
+            if (false === \is_file($cover)) {
+                throw new Exception('Cover file ' . $cover . ' does not exist.');
+            }
+            if (false === \is_readable($cover)) {
+                throw new Exception('Cover file ' . $cover . ' is not readable.');
+            }
+
+            $id = $this->addChapter($title, $cover, null, 0, 'no');
+            
+            // remove from NCX
+            $this->ncx->removeNavPoint($id);
+            
+            // add meta
+            $this->setMetadata('cover', $id);
+            
+            // set guide
+            $this->guide[] = array(
+                'href'  => $this->manifest[$id]['href'],
+                'type'  => 'cover',
+                'title' => $title
+            );
+        }
+        
 
         /**
          * Add chapter
@@ -265,9 +346,9 @@ namespace Epub
          * @param string $file   The content file of the chapter
          * @param string $parent The identifier of the parent navPoint
          *
-         * @return void
+         * @return string Identifier 
          */
-        public function addChapter($title, $file, $parent = null)
+        public function addChapter($title, $file, $parent = null, $pos = null, $linear = 'yes')
         {
             if (false === \is_file($file)) {
                 throw new Exception('File ' . $file . ' does not exist.');
@@ -357,6 +438,11 @@ namespace Epub
                         throw new Exception('File "' . $href .
                             '" is already exists within manifest under id ' . $id);
                     }
+                    
+                    if ($mime == 'application/xml' && $_file === $file) {
+                        $mime =  'application/xhtml+xml';
+                    }
+            
                     $this->manifest[$id] = array(
                         'id'         => $id,
                         'href'       => $href,
@@ -376,17 +462,33 @@ namespace Epub
                     if ($val['href'] === $prevHref) {
                         $spine[$id] = array(
                             'href'   => $href,
-                            'linear' => 'yes'
+                            'linear' => $linear
                         );
                     }
                 }
                 $this->spine = $spine;
             } else {
-                $this->spine[$id] = array(
-                    'href'   => $href,
-                    'linear' => 'yes'
-                );
+                if ($pos !== null) {
+                    $spine = array();
+                    $i = 0;
+                    foreach ($this->spine as $key => $val) {
+                        if ($pos === $i) {
+                            $spine[$id] = array(
+                                'href'   => $href,
+                                'linear' => $linear
+                            );
+                        }
+                        $spine[$key] = $val;
+                    }
+                    $this->spine = $spine;
+                } else {
+                    $this->spine[$id] = array(
+                        'href'   => $href,
+                        'linear' => $linear
+                    );
+                }
             }
+            return $id;
         }
 
         /**

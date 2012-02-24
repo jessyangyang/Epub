@@ -230,6 +230,27 @@ namespace Epub
             $this->navId2navPoint[$item['id']] = $item;
             return $retval;
         }
+        
+        /**
+         * Remove nav point by id
+         *
+         * @param string $id       Identifier of the navigation  point
+         *
+         * @return href of the previous navigation point
+         */
+        public function removeNavPoint($id)
+        {
+            if (false === isset($this->navId2navPoint[$id])) {
+                throw new Exception('Nav point with id "' . $id . '" does not exist.');
+            }
+            if (isset($this->childs[$id])) {
+                foreach ($this->childs[$id] as $child) {
+                    $this->removeNavPoint($child);
+                }
+                unset($this->childs[$id]);
+            }
+            unset($this->parents[$id], $this->navId2src[$id], $this->navId2navPoint[$id]);
+        }
 
         /**
          * Read existing package XML file

@@ -45,10 +45,10 @@ namespace Epub
 {
     require_once __DIR__ . \DIRECTORY_SEPARATOR . 'OCF.php';
 
-	use ZipArchive;
-	use RecursiveIteratorIterator;
-	use RecursiveDirectoryIterator;
-	use Exception;
+    use ZipArchive;
+    use RecursiveIteratorIterator;
+    use RecursiveDirectoryIterator;
+    use Exception;
 
     /**
      *
@@ -78,7 +78,36 @@ namespace Epub
          * OCF instance
          * @var \Epub\OCF
          */
-        protected $ocf;
+        protected $ocf; 
+        
+        /**
+         * Base 64 encoded content of the skeleton epub file.
+         * Due to implementation lack in ZipArchive its not possible to add 
+         * uncompressed files to the archive, i.e. "mimetype" as specified in OPS
+         *
+         * @var string
+         */
+        protected $zipSkeleton = '
+            UEsDBAoAAAAAAChlWEBvYassFAAAABQAAAAIAAAAbWltZXR5cGVhcHBsaWNhdGlvbi9lcHViK3pp
+            cFBLAQIeAwoAAAAAAChlWEBvYassFAAAABQAAAAIAAAAAAAAAAAAAACkgQAAAABtaW1ldHlwZVBL
+            BQYAAAAAAQABADYAAAA6AAAAAAA=';
+            
+        /**
+         * Zip error mapping
+         *
+         * @var array
+         */
+        protected $zipErrors = array(
+            \ZIPARCHIVE::ER_EXISTS => 'File already exists',
+            \ZIPARCHIVE::ER_INCONS => 'Zip archive inconsistent',
+            \ZIPARCHIVE::ER_INVAL  => 'Invalid argument',
+            \ZIPARCHIVE::ER_MEMORY => 'Malloc failure',
+            \ZIPARCHIVE::ER_NOENT  => 'No such file',
+            \ZIPARCHIVE::ER_NOZIP  => 'Not a zip archive',
+            \ZIPARCHIVE::ER_OPEN   => 'Can\'t open file',
+            \ZIPARCHIVE::ER_READ   => 'Read error',
+            \ZIPARCHIVE::ER_SEEK   => 'Seek error',
+        );
 
         /**
          * Constructor.
@@ -117,21 +146,19 @@ namespace Epub
         }
 
         /**
-         * Set chapters of the epub
+         * Set title of the epub
          *
          * @param string $title Title of the epub
          *
-         * @return array
+         * @return void
          */
         public function setTitle($title)
         {
-            $this->ocf->opf->setMetadata('title', $title);
+            $this->ocf->opf->setMetadata('title', $title, 'dc');
         }
 
         /**
-         * Get chapters of the epub
-         *
-         * @param string $title Title of the epub
+         * Get title of the epub
          *
          * @return string
          */
@@ -149,12 +176,12 @@ namespace Epub
          * @param string $creator Creator of the epub
          * @param string $fileAs  File-as attribute's value
          *
-         * @return array
+         * @return void
          */
         public function setCreator($creator, $fileAs = null)
         {
             $this->ocf->opf->setMetadata(
-                'creator', $creator,
+                'creator', $creator, 'dc',
                 array(
                     'opf:role'    => 'aut',
                     'opf:file-as' => $fileAs === null ? $creator : $fileAs,
@@ -180,12 +207,12 @@ namespace Epub
          *
          * @param string $value Language code
          *
-         * @return array
+         * @return void
          */
         public function setLanguage($value)
         {
             $this->ocf->opf->setMetadata(
-                'language', $value,
+                'language', $value, 'dc', 
                 array(
                     'xsi:type'    => 'dcterms:RFC3066',
                 )
@@ -210,12 +237,12 @@ namespace Epub
          *
          * @param string $value Identifier
          *
-         * @return array
+         * @return void
          */
         public function setIdentifier($value)
         {
             $this->ocf->opf->setMetadata(
-                'identifier', $value,
+                'identifier', $value, 'dc', 
                 array(
                     'id' => 'BookId',
                 )
@@ -240,11 +267,11 @@ namespace Epub
          *
          * @param string $value Publisher
          *
-         * @return array
+         * @return void
          */
         public function setPublisher($value)
         {
-            $this->ocf->opf->setMetadata('publisher', $value);
+            $this->ocf->opf->setMetadata('publisher', $value, 'dc');
         }
 
         /**
@@ -265,12 +292,12 @@ namespace Epub
          *
          * @param string $value Date
          *
-         * @return array
+         * @return void
          */
         public function setDate($value)
         {
             $this->ocf->opf->setMetadata(
-                'date', $value,
+                'date', $value, 'dc', 
                 array(
                     'xsi:type' => 'dcterms:W3CDTF',
                 )
@@ -295,11 +322,11 @@ namespace Epub
          *
          * @param string $value Copyright
          *
-         * @return array
+         * @return void
          */
         public function setRights($value)
         {
-            $this->ocf->opf->setMetadata('rights', $value);
+            $this->ocf->opf->setMetadata('rights', $value, 'dc');
         }
 
         /**
@@ -320,11 +347,11 @@ namespace Epub
          *
          * @param string $value Description
          *
-         * @return array
+         * @return void
          */
         public function setDescription($value)
         {
-            $this->ocf->opf->setMetadata('description', $value);
+            $this->ocf->opf->setMetadata('description', $value, 'dc');
         }
 
         /**
@@ -343,26 +370,28 @@ namespace Epub
         /**
          * Set metadata of the epub
          *
-         * @param string $value Description
+         * @param string $meta   Meta name
+         * @param string $value  Value
+         * @param string $prefix Namespace
+         * @param array  $attrs  Attributes
          *
-         * @return array
          */
-        public function setMetadata($name, $value)
+        public function setMetadata($meta, $value , $prefix = null, array $attrs = array())
         {
-            $this->ocf->opf->setMetadata($name, $value);
+            $this->ocf->opf->setMetadata($name, $value, $prefix, $attrs);
         }
 
         /**
          * Get metadata of the epub
          *
-         * @return string
+         * @param string $meta   Meta name
+         * @param string $prefix Namespace, default ``dc``
+         *
+         * @return mixed
          */
-        public function getMetadata($name)
+        public function getMetadata($meta, $prefix = 'dc')
         {
-            $meta = $this->ocf->opf->getMetadata($name);
-            if (false !== $meta) {
-                return $meta['value'];
-            }
+            return $this->ocf->opf->getMetadata($name, $prefix);
         }
 
         /**
@@ -370,7 +399,7 @@ namespace Epub
          *
          * Returns an array of ids of documents providing a linear reading order
          *
-         * @return string
+         * @return array
          */
         public function getSpine()
         {
@@ -382,11 +411,72 @@ namespace Epub
          *
          * Returns an array of ids of documents providing a linear reading order
          *
-         * @return string
+         * @return void
          */
         public function setSpine(array $spine)
         {
-            return $this->ocf->opf->setSpine($spine);
+            $this->ocf->opf->setSpine($spine);
+        }
+        
+        /**
+         * Get guide of the epub.
+         *
+         * Returns an array of ids of documents providing a linear reading order
+         *
+         * @return array
+         */
+        public function getGuide()
+        {
+            return $this->ocf->opf->getGuide();
+        }
+
+        /**
+         * Set spine of the epub.
+         *
+         * Returns an array of ids of documents providing a linear reading order
+         *
+         * @return void
+         */
+        public function setGuide(array $guide)
+        {
+            $this->ocf->opf->setGuide($guide);
+        }
+        
+        /**
+         * Set cover of the book
+         *
+         * @param string $cover Cover image
+         * @param string $title Title of the cover page
+         *
+         * @return void
+         */
+        public function setCover($cover, $title = 'Cover')
+        {
+            if (false === \is_file($cover)) {
+                throw new Exception('Cover file ' . $cover . ' does not exist.');
+            }
+            if (false === \is_readable($cover)) {
+                throw new Exception('Cover file ' . $cover . ' is not readable.');
+            }
+            $filename = basename($cover);
+            if (false === \copy($cover, $this->tmpDir . $filename)) {
+                throw new Exception('Cannot copy cover file ' . $cover . ' to ' . 
+                        $this->tmpDir . $filename);
+            }
+            
+            $html = '<?xml version="1.0"?>' . PHP_EOL . 
+                    '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" ' . 
+                    '"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">' . PHP_EOL . 
+                    '<html xmlns="http://www.w3.org/1999/xhtml">' . PHP_EOL . 
+                    '<head><title>' . $title . '</title>' . PHP_EOL . 
+                    '<style type="text/css">' . PHP_EOL . 
+                    'div { text-align: center }' . PHP_EOL . 
+                    'img { max-width: 100%; }' . PHP_EOL . 
+                    '</style></head>' . PHP_EOL . 
+                    '<body><div><img src="' . $filename . '" alt="Cover" />' . PHP_EOL . 
+                    '</div></body></html>';
+            \file_put_contents($this->tmpDir . 'cover.html', $html);
+            $this->ocf->opf->setCover($this->tmpDir . 'cover.html', $title);
         }
 
         /**
@@ -446,14 +536,17 @@ namespace Epub
         }
 
         /**
-         * Save epub under given filename
+         * Save epub
          *
          * @param string $filename Filename of the resulting epub
          *
          * @return void
          */
-        public function save($filename)
+        public function save($filename = null)
         {
+            if ($filename === null) {
+                $filename = $this->filename;
+            }
             $path = \dirname($filename);
             if (false === \is_dir($path) || false === \is_writable($path)) {
                 throw new Exception('Directory "' . $path .
@@ -472,21 +565,27 @@ namespace Epub
             $rootPath = $this->tmpDir . \uniqid() . \DIRECTORY_SEPARATOR;
             \mkdir($rootPath);
             $this->ocf->asXML($rootPath);
-            \file_put_contents($rootPath . 'mimetype', 'application/epub+zip');
 
             $zip = new ZipArchive;
-            $zip->open($filename, ZipArchive::CREATE);
+            \file_put_contents($filename, \base64_decode($this->zipSkeleton));
+            if (true !== ($r = $zip->open($filename))) {
+                throw new Exception('Cannot open skeleton epub file due to following error: ' . 
+                    $this->zipErrors[$r]);
+            }
 
             $addedDirs = array();
             $iterator  = new RecursiveIteratorIterator(
                 new RecursiveDirectoryIterator($rootPath));
             foreach ($iterator as $item) {
-                if (true === $item->isDir()) {
+                if (true === $item->isDir() || $item->getBasename() == 'mimetype') {
                     continue;
                 }
-                $zip->addFile($item->__toString(),
-                    str_replace($rootPath, '', $item->__toString()));
-            }
+                $name    = $item->__toString();
+                $zipName = str_replace($rootPath, '', $name);
+                if (false === $zip->addFile($name, $zipName)) {
+                    throw new Exception('Cannot add file ' . $zipName . ' to zip archive');
+                }
+            } 
             $zip->close();
             unset($zip);
         }
@@ -526,7 +625,7 @@ namespace Epub
 
             // check if its really epub file
             if (false === \is_file($f = $this->tmpDir . 'mimetype')
-                || 'application/epub+zip' !== \trim(\file_get_contents($f))
+                || 'application/epub+zip' !== \file_get_contents($f)
                 || false === \is_dir($this->tmpDir . 'META-INF')
                 || false === \is_file($this->tmpDir . 'META-INF' . $ds . 'container.xml')
             ) {

@@ -147,7 +147,7 @@ namespace Epub\PHPUnitTests
                 $this->markTestSkipped('Epub file ' . $epubFile . ' is missing');
                 return;
             }
-            self::$oEpub = new Epub($epubFile);print_r(self::$oEpub);
+            self::$oEpub = new Epub($epubFile);
             $this->assertInstanceOf('\\Epub\\Epub', self::$oEpub);
             $this->assertSame(self::$oEpub->getTitle(), 'Moby Dick, or, the whale');
             $this->assertSame(self::$oEpub->getLanguage(), 'en');
@@ -234,7 +234,7 @@ namespace Epub\PHPUnitTests
          * @return void
          */
         public function testSetPublisher()
-        {
+        {xdebug_break();
             if (false === (self::$oEpub instanceof Epub)) {
                 $this->markTestSkipped('No opened epub file exists.');
                 return;

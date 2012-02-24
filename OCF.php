@@ -84,7 +84,7 @@ namespace Epub
                 $this->readXML($xmlFile, $strict);
             } else {
                 $this->rootFiles[] = array(
-                    'full-path'  => 'META-INF/content.opf',
+                    'full-path'  => 'OEBPS/content.opf',
                     'media-type' => 'application/oebps-package+xml'
                 );
                 $this->opf = new OPF();
