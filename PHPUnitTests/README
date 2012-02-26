@@ -1,0 +1,16 @@
+To run tests do following:
+
+1. Poll PHP unit stuff from following locations:
+     git://github.com/sebastianbergmann/phpunit.git
+     git://github.com/sebastianbergmann/php-code-coverage.git
+     git://github.com/sebastianbergmann/php-file-iterator.git
+     git://github.com/sebastianbergmann/php-token-stream.git
+     git://github.com/sebastianbergmann/php-text-template.git
+     git://github.com/sebastianbergmann/php-timer.git
+
+2. Create ENV variable PHPUNIT with correct paths:
+     export PHPUNITPATH="<PATH/TO/PHPUNIT>"
+     export PHPUNIT="$PHPUNITPATH/phpunit:$PHPUNITPATH/php-code-coverage:$PHPUNITPATH/php-file-iterator:$PHPUNITPATH/php-token-stream:$PHPUNITPATH/php-text-template:$PHPUNITPATH/php-timer"
+
+5. Execute tests:
+     php -d include_path=".:$PHPUNIT" PHPUnitTests/AllTests.php
