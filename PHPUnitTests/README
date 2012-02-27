@@ -1,16 +1,28 @@
 To run tests do following:
 
 1. Poll PHP unit stuff from following locations:
-     git://github.com/sebastianbergmann/phpunit.git
-     git://github.com/sebastianbergmann/php-code-coverage.git
-     git://github.com/sebastianbergmann/php-file-iterator.git
-     git://github.com/sebastianbergmann/php-token-stream.git
-     git://github.com/sebastianbergmann/php-text-template.git
-     git://github.com/sebastianbergmann/php-timer.git
+------------------------------------------------
 
-2. Create ENV variable PHPUNIT with correct paths:
-     export PHPUNITPATH="<PATH/TO/PHPUNIT>"
-     export PHPUNIT="$PHPUNITPATH/phpunit:$PHPUNITPATH/php-code-coverage:$PHPUNITPATH/php-file-iterator:$PHPUNITPATH/php-token-stream:$PHPUNITPATH/php-text-template:$PHPUNITPATH/php-timer"
+    mkdir phpunit && cd phpunit
+    git clone git://github.com/sebastianbergmann/phpunit.git
+    git clone git://github.com/sebastianbergmann/dbunit.git
+    git clone git://github.com/sebastianbergmann/php-file-iterator.git
+    git clone git://github.com/sebastianbergmann/php-text-template.git
+    git clone git://github.com/sebastianbergmann/php-code-coverage.git
+    git clone git://github.com/sebastianbergmann/php-token-stream.git
+    git clone git://github.com/sebastianbergmann/php-timer.git
+    git clone git://github.com/sebastianbergmann/phpunit-mock-objects.git
+    git clone git://github.com/sebastianbergmann/phpunit-selenium.git
+    git clone git://github.com/sebastianbergmann/phpunit-story.git
+    git clone git://github.com/sebastianbergmann/php-invoker.git
 
-5. Execute tests:
-     php -d include_path=".:$PHPUNIT" PHPUnitTests/AllTests.php
+2. Create runtests.sh in root directory of the Epub project with following content:
+-----------------------------------------------------------------------------------
+#!/bin/sh
+PHPUNIT="."
+export PHPUNITPATH="/path/to/phpunit"
+for x in `ls $PHPUNITPATH`; do PHPUNIT=$PHPUNIT:$PHPUNITPATH/$x; done
+/path/to/php -d include_path="$PHPUNIT" $PHPUNITPATH/phpunit/phpunit.php PHPUnitTests/AllTests.php
+
+5. Execute runtests.sh
+----------------------

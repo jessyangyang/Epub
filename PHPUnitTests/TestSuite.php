@@ -56,24 +56,7 @@ namespace Epub\PHPUnitTests
      */
     function autoload($className)
     {
-        static $incs;
-        if ($incs === null) {
-            $incs = \explode(PATH_SEPARATOR, \ini_get('include_path'));
-            foreach ($incs as $k => $v) {
-                $incs[\str_replace('-', '/', \basename($v))] = $v;
-            }
-        }
-        if (strpos($className, 'PHPUnit') === 0 || strpos($className, 'PHP') === 0) {
-            foreach ($incs as $incPath) {
-                $filePath = $incPath . '/'. str_replace('_', DIRECTORY_SEPARATOR, $className);
-                $fileName = $filePath . '.php';
-                if (is_file($fileName)) {
-                    include $fileName;
-                    break;
-                }
-            }
-        } else if (\strpos($className, 'Epub\\') === 0) {
-
+        if (\strpos($className, 'Epub\\') === 0) {
             $filePath = str_replace('\\', \DIRECTORY_SEPARATOR, \str_replace('Epub\\', '', \ucfirst($className)));
             $fileName = $filePath . '.php';
             if (\is_file($fileName)) {

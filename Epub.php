@@ -458,6 +458,10 @@ namespace Epub
             if (false === \is_readable($cover)) {
                 throw new Exception('Cover file ' . $cover . ' is not readable.');
             }
+            if (false === strpos(($mime = OPF::getMimetype($cover)), 'image/')) {
+                throw new Exception('Unexpected mimetype of the cover file ' . 
+                        $cover . ': ' . $mime);
+            }
             $filename = basename($cover);
             if (false === \copy($cover, $this->tmpDir . $filename)) {
                 throw new Exception('Cannot copy cover file ' . $cover . ' to ' . 
@@ -476,7 +480,7 @@ namespace Epub
                     '<body><div><img src="' . $filename . '" alt="Cover" />' . PHP_EOL . 
                     '</div></body></html>';
             \file_put_contents($this->tmpDir . 'cover.html', $html);
-            $this->ocf->opf->setCover($this->tmpDir . 'cover.html', $title);
+            $this->ocf->opf->setCoverPage($this->tmpDir . 'cover.html', $title);
         }
 
         /**

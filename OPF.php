@@ -306,14 +306,14 @@ namespace Epub
         }
         
         /**
-         * Set cover of the book
+         * Set cover page of the book
          *
-         * @param string $cover Cover html file
+         * @param string $cover Cover-page html file
          * @param string $title Guide title
          *
          * @return void
          */
-        public function setCover($cover, $title)
+        public function setCoverPage($cover, $title)
         {
             if (false === \is_file($cover)) {
                 throw new Exception('Cover file ' . $cover . ' does not exist.');

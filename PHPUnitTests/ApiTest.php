@@ -50,13 +50,13 @@ namespace Epub\PHPUnitTests
     /**
      * ApiTest class
      *
-     * @package    DB
+     * @package    Epub
      * @subpackage PHPUnitTests
      * @author     Dmitry Vinogradov <dmitri.vinogradov@gmail.com>
      * @copyright  2002-2011 Dmitry Vinogradov <dmitri.vinogradov@gmail.com>
      * @license    http://www.opensource.org/licenses/bsd-license.php  BSD License
      * @version    Release: @package_version@
-     * @link       https://github.com/dmitry-vinogradov/PHP-DB
+     * @link       https://github.com/dmitry-vinogradov/Epub
      * @since      Class available since Release 1.0.0
      */
     class ApiTest extends \PHPUnit_Framework_TestCase

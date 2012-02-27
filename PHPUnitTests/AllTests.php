@@ -85,17 +85,5 @@ namespace Epub\PHPUnitTests
             return $suite;
         }
     }
-
-    // run the tests
-    AllTests::main(
-        array(
-            'debug'                       => true,
-            'verbose'                     => true,
-            'convertErrorsToExceptions'   => true,
-            'convertNoticesToExceptions'  => true,
-            'convertWarningsToExceptions' => true,/**/
-
-        )
-    );
 }
 
