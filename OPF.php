@@ -112,6 +112,67 @@ namespace Epub
          * @var array
          */
         protected $href2id = array();
+        
+        /**
+         * Dublin Core Metadata Element Set.
+         * key is a field name and the value its
+         * requirement for the package
+         * 
+         * @var array
+         */
+        protected $dcSet = array(
+            'title'        => true,
+            'creator'      => false,
+            'subject'      => false,
+            'description'  => false,
+            'publisher'    => false,
+            'contributor'  => false,
+            'date'         => false,
+            'type'         => false,
+            'format'       => false,
+            'identifier'   => true,
+            'source'       => false,
+            'language'     => true,
+            'relation'     => false,
+            'coverage'     => false,
+            'rights'       => false,
+        );
+        
+        /**
+         * Available roles (MARC relator code list)
+         * @var array
+         */
+        protected $roles = array(
+            'adp', // Adapter
+            'ann', // Annotator
+            'arr', // Arranger
+            'art', // Artist
+            'asn', // Associated name
+            'aut', // Author
+            'aqt', // Author in quotations or text extracts
+            'aft', // Author of afterword, colophon, etc.
+            'aui', // Author of introduction, etc.
+            'ant', // Bibliographic antecedent
+            'bkp', // Book producer
+            'clb', // Collaborator
+            'cmm', // Commentator
+            'dsr', // Designer
+            'edt', // Editor
+            'ill', // Illustrator
+            'lyr', // Lyricist
+            'mdc', // Metadata contact
+            'mus', // Musician
+            'nrt', // Narrator
+            'oth', // Other
+            'pht', // Photographer
+            'prt', // Printer
+            'red', // Redactor
+            'rev', // Reviewer
+            'spn', // Sponsor
+            'ths', // Thesis advisor
+            'trc', // Transcriber
+            'trl', // Translator
+        );
 
         /**
          * Constructor.
@@ -127,27 +188,27 @@ namespace Epub
             } else {
                 $this->uid      = 'Epub-' . uniqid();
                 $this->metadata = array(
-                    'dc:title'      => array(
+                    'dc:title'      => array(array(
                         'value' => 'Untitled',
                         'attrs' => array()
-                    ),
-                    'dc:language'   => array(
+                    )),
+                    'dc:language'   => array(array(
                         'value' => 'en',
                         'attrs' => array()
-                    ),
-                    'dc:creator'    => array(
+                    )),
+                    'dc:creator'    => array(array(
                         'value' => 'Unknown',
                         'attrs' => array(
                             'opf:file-as' => 'Unknown',
                             'opf:role'    => 'aut'
                         )
-                    ),
-                    'dc:identifier' => array(
+                    )),
+                    'dc:identifier' => array(array(
                         'value' => $this->uid,
                         'attrs' => array(
                             'id' => 'EpubId'
                         )
-                    )
+                    ))
                 );
                 $this->ncx = new NCX();
                 $this->ncx->setUid($this->uid);
@@ -187,25 +248,52 @@ namespace Epub
         /**
          * Set metadata
          *
-         * @param string $meta   Meta name
-         * @param string $value  Value
+         * @param string $field  Meta field name
+         * @param string $value  Value, if value is set to null this will remove all
+         *                       metadata values associated with this field
          * @param string $prefix Namespace
          * @param array  $attrs  Attributes
          *
          */
-        public function setMetadata($meta, $value , $prefix = null, array $attrs = array())
+        public function setMetadata($field, $value, $prefix = null, array $attrs = array())
         {
             if ($prefix === null) {
-                $this->metadata['meta'][$meta] = $value;
+                if ($value === null) {
+                    unset($this->metadata['meta'][$field]);
+                    return;
+                }
+                $this->metadata['meta'][$field] = $value;
                 return;
             }
-            $key = $prefix . ':' . $meta;
-            $this->metadata[$key] = array(
+            if ($prefix === 'dc' && false === isset($this->dcSet[$field])) {
+                throw new Exception('Unknown Dublin Core Metadata field ' . $field);
+            }
+            $key = $prefix . ':' . $field;
+            if ($field === 'creator') {
+                if (false === isset($attrs['opf:role']) 
+                        || false === in_array($attrs['opf:role'], $this->roles)) {
+                    throw new Exception('Unknown role ' . $attrs['opf:role']);
+                }
+            }
+            if ($value === null) {
+                if ($prefix === 'dc' && $this->dcSet[$field]) {
+                    throw new Exception('Cannot remove required Dublin Core Metadata field ' . $field);
+                }
+                unset($this->metadata[$key]);
+                return;
+            }
+            $meta = array(
                 'value' => $value,
                 'attrs' => $attrs
             );
+            if (false === isset($this->metadata[$key]) 
+                    || ($prefix === 'dc' && $this->dcSet[$field])
+            ) {
+                $this->metadata[$key] = array();
+            }
+            $this->metadata[$key][] = $meta;
         }
-
+        
         /**
          * Get manifest by identifier
          *
@@ -216,7 +304,8 @@ namespace Epub
         public function getManifestById($id)
         {
             return null === $id ?
-                $this->manifest : (true === isset($this->manifest[$id]) ? $this->manifest[$id] : null);
+                $this->manifest : (true === isset($this->manifest[$id]) ? 
+                    $this->manifest[$id] : null);
         }
 
         /**
@@ -519,8 +608,7 @@ namespace Epub
                         }
                         $this->metadata['meta'][XML::getAttr($value, 'name')] = XML::getAttr($value, 'content');
                     } else {
-                        $attrs = array();
-                        $this->metadata[$key] = array(
+                        $meta = array(
                             'value' => (string)$value,
                             'attrs' => array()
                         );
@@ -528,10 +616,14 @@ namespace Epub
                             foreach ($ns as $_prefix => $_uri) {
                                 foreach ($value->attributes($_prefix, true) as $_key => $_value) {
                                     $_key = false === empty($_prefix) ? $_prefix . ':' . $_key :  $_key;
-                                    $this->metadata[$key]['attrs'][$_key] = (string)$_value;
+                                    $meta['attrs'][$_key] = (string)$_value;
                                 }
                             }
                         }
+                        if (!isset($this->metadata[$key])) {
+                            $this->metadata[$key] = array();
+                        }
+                        $this->metadata[$key][] = $meta;
                     }
                 }
             }
@@ -670,22 +762,24 @@ namespace Epub
             // metadata
             $xmlStr .= '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/" ' .
                        'xmlns:opf="http://www.idpf.org/2007/opf">' . PHP_EOL;
-            foreach ($this->metadata as $key => $item) {
+            foreach ($this->metadata as $key => $meta) {
                 if ($key === 'meta') {
-                    foreach ($item as $name => $content) {
+                    foreach ($meta as $name => $content) {
                         $xmlStr .= '<meta name="' . $name . '" content="' . 
                                 \htmlspecialchars($content, \ENT_COMPAT, 'UTF-8') . '" />' . PHP_EOL;
                     }
                 } else {
-                    $xmlStr .= '<' . $key;
-                    if (true === isset($item['attrs'])) {
-                        foreach ($item['attrs'] as $name => $value) {
-                            $xmlStr .= ' ' . $name . '="' . \htmlspecialchars($value, \ENT_COMPAT, 'UTF-8') . '"';
+                    foreach ($meta as $item) {
+                        $xmlStr .= '<' . $key;
+                        if (true === isset($item['attrs'])) {
+                            foreach ($item['attrs'] as $name => $value) {
+                                $xmlStr .= ' ' . $name . '="' . \htmlspecialchars($value, \ENT_COMPAT, 'UTF-8') . '"';
+                            }
                         }
+                        $xmlStr .= $item['value'] === '' ? ' />' : '>' .  
+                                \htmlspecialchars($item['value'], \ENT_COMPAT, 'UTF-8') . '</' . $key . '>';
+                        $xmlStr .= PHP_EOL;
                     }
-                    $xmlStr .= $item['value'] === '' ? ' />' : '>' .  
-                            \htmlspecialchars($item['value'], \ENT_COMPAT, 'UTF-8') . '</' . $key . '>';
-                    $xmlStr .= PHP_EOL;
                 }
             }
             $xmlStr .= '</metadata>' . PHP_EOL;

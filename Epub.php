@@ -165,9 +165,7 @@ namespace Epub
         public function getTitle()
         {
             $meta = $this->ocf->opf->getMetadata('title');
-            if (false !== $meta) {
-                return $meta['value'];
-            }
+            return false !== $meta ? $meta[count($meta) - 1]['value'] : false;
         }
 
         /**
@@ -178,12 +176,12 @@ namespace Epub
          *
          * @return void
          */
-        public function setCreator($creator, $fileAs = null)
+        public function setCreator($creator, $fileAs = null, $role = 'aut')
         {
             $this->ocf->opf->setMetadata(
                 'creator', $creator, 'dc',
                 array(
-                    'opf:role'    => 'aut',
+                    'opf:role'    => $role,
                     'opf:file-as' => $fileAs === null ? $creator : $fileAs,
                 )
             );
@@ -191,15 +189,13 @@ namespace Epub
 
         /**
          * Get creator of the epub
-         *
+         * 
          * @return string
          */
         public function getCreator()
         {
             $meta = $this->ocf->opf->getMetadata('creator');
-            if (false !== $meta) {
-                return $meta['value'];
-            }
+            return false !== $meta ? $meta[count($meta) - 1]['value'] : false;
         }
 
         /**
@@ -227,9 +223,7 @@ namespace Epub
         public function getLanguage()
         {
             $meta = $this->ocf->opf->getMetadata('language');
-            if (false !== $meta) {
-                return $meta['value'];
-            }
+            return false !== $meta ? $meta[count($meta) - 1]['value'] : false;
         }
 
         /**
@@ -257,9 +251,7 @@ namespace Epub
         public function getIdentifier()
         {
             $meta = $this->ocf->opf->getMetadata('identifier');
-            if (false !== $meta) {
-                return $meta['value'];
-            }
+            return false !== $meta ? $meta[count($meta) - 1]['value'] : false;
         }
 
         /**
@@ -282,9 +274,7 @@ namespace Epub
         public function getPublisher()
         {
             $meta = $this->ocf->opf->getMetadata('publisher');
-            if (false !== $meta) {
-                return $meta['value'];
-            }
+            return false !== $meta ? $meta[count($meta) - 1]['value'] : false;
         }
 
         /**
@@ -312,9 +302,7 @@ namespace Epub
         public function getDate()
         {
             $meta = $this->ocf->opf->getMetadata('date');
-            if (false !== $meta) {
-                return $meta['value'];
-            }
+            return false !== $meta ? $meta[count($meta) - 1]['value'] : false;
         }
 
         /**
@@ -337,9 +325,7 @@ namespace Epub
         public function getRights()
         {
             $meta = $this->ocf->opf->getMetadata('rights');
-            if (false !== $meta) {
-                return $meta['value'];
-            }
+            return false !== $meta ? $meta[count($meta) - 1]['value'] : false;
         }
 
         /**
@@ -362,9 +348,7 @@ namespace Epub
         public function getDescription()
         {
             $meta = $this->ocf->opf->getMetadata('description');
-            if (false !== $meta) {
-                return $meta['value'];
-            }
+            return false !== $meta ? $meta[count($meta) - 1]['value'] : false;
         }
 
         /**
@@ -384,12 +368,12 @@ namespace Epub
         /**
          * Get metadata of the epub
          *
-         * @param string $meta   Meta name
+         * @param string $field  Metadata field name
          * @param string $prefix Namespace, default ``dc``
          *
          * @return mixed
          */
-        public function getMetadata($meta, $prefix = 'dc')
+        public function getMetadata($field, $prefix = 'dc')
         {
             return $this->ocf->opf->getMetadata($name, $prefix);
         }
