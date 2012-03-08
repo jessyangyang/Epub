@@ -39,7 +39,7 @@
  * @copyright  2002-2011 Dmitry Vinogradov <dmitri.vinogradov@gmail.com>
  * @license    http://www.opensource.org/licenses/bsd-license.php  BSD License
  * @link       https://github.com/dmitry-vinogradov/Epub
- * @version    Release: %RELEASE%
+ * @version    Release: 0.99.1
  */
 namespace Epub
 {
