@@ -39,7 +39,7 @@
  * @copyright  2002-2011 Dmitry Vinogradov <dmitri.vinogradov@gmail.com>
  * @license    http://www.opensource.org/licenses/bsd-license.php  BSD License
  * @link       https://github.com/dmitry-vinogradov/Epub
- * @since      File available since Release 1.0.0
+ * @version    Release: $RELEASE
  */
 namespace Epub
 {
@@ -55,9 +55,8 @@ namespace Epub
      * @author     Dmitry Vinogradov <dmitri.vinogradov@gmail.com>
      * @copyright  2002-2011 Dmitry Vinogradov <dmitri.vinogradov@gmail.com>
      * @license    http://www.opensource.org/licenses/bsd-license.php  BSD License
-     * @version    Release: @package_version@
+     * @version    Release: $RELEASE
      * @link       https://github.com/dmitry-vinogradov/Epub
-     * @since      Class available since Release 1.0.0
      */
     class XML
     {
@@ -99,7 +98,7 @@ namespace Epub
             $xdoc = new DOMDocument();
             if (false === $xdoc->loadXML($xmlString, \LIBXML_NSCLEAN | \LIBXML_NOCDATA | \LIBXML_DTDLOAD)
                 || false !== libxml_get_last_error()) {
-                self::raiseError();
+                self::raiseError($xmlString);
             }
 
             if ($schema !== null) {
@@ -121,7 +120,7 @@ namespace Epub
                         break;
                 }
                 if (false === $valid) {
-                    self::raiseError();
+                    self::raiseError($xmlString);
                 }
             }
 
@@ -250,20 +249,20 @@ namespace Epub
 
         /**
          * Raise XML error
+         * 
+         * @param string $xml XML Content
          *
          * @return void
          * @throws Exception
          */
-        protected static function raiseError()
+        protected static function raiseError($xml)
         {
             $errorMessage = '';
             foreach (\libxml_get_errors() as $error) {
-                $errorMessage .= trim($error->message) . ' on line ' . $error->line . ':' . $error->column;
-                if ($error->file) {
-                    $errorMessage .= ' in file ' . $error->file;
-                }
-                $errorMessage .= PHP_EOL;
+                $errorMessage .= trim($error->message) . ' on line ' . $error->line . 
+                        ':' . $error->column . PHP_EOL;
             }
+            $errorMessage .= 'XML:' . PHP_EOL . $xml;
             \libxml_clear_errors();
             throw new Exception($errorMessage);
         }
