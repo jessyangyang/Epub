@@ -39,7 +39,7 @@
  * @copyright  2002-2011 Dmitry Vinogradov <dmitri.vinogradov@gmail.com>
  * @license    http://www.opensource.org/licenses/bsd-license.php  BSD License
  * @link       https://github.com/dmitry-vinogradov/Epub
- * @since      File available since Release 1.0.0
+ * @version    Release: %RELEASE%
  */
 namespace Epub
 {
@@ -48,7 +48,13 @@ namespace Epub
     use Exception;
 
     /**
-     * Navigation Center eXtended (NCX) class
+     * NCX (Navigation Center eXtended) class
+     * 
+     * @package    Epub
+     * @author     Dmitry Vinogradov <dmitri.vinogradov@gmail.com>
+     * @copyright  2002-2011 Dmitry Vinogradov <dmitri.vinogradov@gmail.com>
+     * @license    http://www.opensource.org/licenses/bsd-license.php  BSD License
+     * @link       https://github.com/dmitry-vinogradov/Epub
      */
     class NCX
     {
