@@ -36,4 +36,4 @@ chmod +w .version.old
 echo $VN$MARKER > .version
 RELEASE="$(($VN/1000000)).$(( ($VN/1000)%1000 )).$(( $VN%1000 ))$MARKER"
 echo "Bumping sources to release $RELEASE"
-grep -rl '%RELEASE%' *.php|xargs sed -i '' 's/%RELEASE%/$RELEASE/g'
+grep -rl "%RELEASE%" *.php|xargs sed -i "" "s/%RELEASE%/$RELEASE/g"
